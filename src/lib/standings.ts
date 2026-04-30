@@ -28,12 +28,9 @@ export type TeamStanding = {
   team_id: string;
   teamName: string;
   mp: number;
-  wins: number;
-  losses: number;
   gf: number;
   ga: number;
   gd: number;
-  points: number;
 };
 
 export function teamName(
@@ -56,12 +53,9 @@ export function computeStandings(
       team_id: t.id,
       teamName: teamName(t, players),
       mp: 0,
-      wins: 0,
-      losses: 0,
       gf: 0,
       ga: 0,
       gd: 0,
-      points: 0,
     });
   }
   for (const m of matches) {
@@ -76,20 +70,11 @@ export function computeStandings(
     t1.ga += m.score_team2;
     t2.gf += m.score_team2;
     t2.ga += m.score_team1;
-    if (m.score_team1 > m.score_team2) {
-      t1.wins++;
-      t1.points += 3;
-      t2.losses++;
-    } else if (m.score_team1 < m.score_team2) {
-      t2.wins++;
-      t2.points += 3;
-      t1.losses++;
-    }
   }
   for (const s of map.values()) {
     s.gd = s.gf - s.ga;
   }
   return [...map.values()].sort(
-    (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf
+    (a, b) => b.gf - a.gf || b.gd - a.gd || a.ga - b.ga
   );
 }

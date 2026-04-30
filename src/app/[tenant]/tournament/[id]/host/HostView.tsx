@@ -259,10 +259,9 @@ function HostInner({
                         <th className="px-2 py-2 w-8">#</th>
                         <th className="text-left px-3 py-2 font-medium">Lag</th>
                         <th className="px-2 py-2">MP</th>
-                        <th className="px-2 py-2">W</th>
-                        <th className="px-2 py-2">L</th>
+                        <th className="px-2 py-2">GF</th>
+                        <th className="px-2 py-2">GA</th>
                         <th className="px-2 py-2">GD</th>
-                        <th className="px-2 py-2">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -276,13 +275,10 @@ function HostInner({
                           </td>
                           <td className="px-3 py-2">{s.teamName}</td>
                           <td className="px-2 py-2 text-center">{s.mp}</td>
-                          <td className="px-2 py-2 text-center">{s.wins}</td>
-                          <td className="px-2 py-2 text-center">{s.losses}</td>
-                          <td className="px-2 py-2 text-center">
-                            {s.gd > 0 ? `+${s.gd}` : s.gd}
-                          </td>
+                          <td className="px-2 py-2 text-center">{s.gf}</td>
+                          <td className="px-2 py-2 text-center">{s.ga}</td>
                           <td className="px-2 py-2 text-center font-semibold">
-                            {s.points}
+                            {s.gd > 0 ? `+${s.gd}` : s.gd}
                           </td>
                         </tr>
                       ))}

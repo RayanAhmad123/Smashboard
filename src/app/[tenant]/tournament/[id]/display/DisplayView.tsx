@@ -29,7 +29,6 @@ type Loaded = {
 };
 
 const POLL_MS = 15_000;
-const ROTATE_MS = 20_000;
 
 const FORMAT_LABEL: Record<TournamentFormat, string> = {
   gruppspel: "Gruppspel",
@@ -37,8 +36,6 @@ const FORMAT_LABEL: Record<TournamentFormat, string> = {
   americano: "Americano",
   team_mexicano: "Lag-Mexicano",
 };
-
-type ViewMode = "matches" | "standings";
 
 export function DisplayView({
   tenant,
@@ -49,7 +46,6 @@ export function DisplayView({
 }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
-  const [view, setView] = useState<ViewMode>("matches");
 
   const load = useCallback(async () => {
     const [tRes, gRes, mRes, teamsRes, courtsRes] = await Promise.all([
@@ -193,18 +189,6 @@ export function DisplayView({
     };
   }, [data]);
 
-  // Auto-rotate between matches and standings (only when there are groups).
-  useEffect(() => {
-    if (!computed?.hasGroups) {
-      setView("matches");
-      return;
-    }
-    const t = setInterval(() => {
-      setView((v) => (v === "matches" ? "standings" : "matches"));
-    }, ROTATE_MS);
-    return () => clearInterval(t);
-  }, [computed?.hasGroups]);
-
   const accent = tenant.primary_color || "#10b981";
 
   if (!data || !computed) {
@@ -252,8 +236,8 @@ export function DisplayView({
         progress={progress}
       />
 
-      <main className="flex-1 min-h-0 px-[1.5vw] py-[1vh]">
-        {view === "matches" ? (
+      <main className="flex-1 min-h-0 px-[1.5vw] py-[1vh] flex gap-[1vw]">
+        <div className="flex-1 min-w-0">
           <MatchesView
             courts={data.courts}
             byCourt={computed.byCourt}
@@ -263,24 +247,21 @@ export function DisplayView({
             playerMap={computed.playerMap}
             accent={accent}
           />
-        ) : (
-          <StandingsView
-            groups={data.groups}
-            teams={data.teams}
-            matches={data.matches}
-            playerMap={computed.playerMap}
-            accent={accent}
-          />
+        </div>
+        {computed.hasGroups && (
+          <aside className="w-[22vw] max-w-[420px] min-w-[240px] shrink-0">
+            <StandingsColumn
+              groups={data.groups}
+              teams={data.teams}
+              matches={data.matches}
+              playerMap={computed.playerMap}
+              accent={accent}
+            />
+          </aside>
         )}
       </main>
 
-      <Footer
-        tournament={data.tournament}
-        tenant={tenant}
-        accent={accent}
-        view={view}
-        showRotation={computed.hasGroups}
-      />
+      <Footer tournament={data.tournament} tenant={tenant} />
     </div>
   );
 }
@@ -652,7 +633,7 @@ function NextUp({
   );
 }
 
-function StandingsView({
+function StandingsColumn({
   groups,
   teams,
   matches,
@@ -665,130 +646,107 @@ function StandingsView({
   playerMap: Map<string, Player>;
   accent: string;
 }) {
-  const cols = getGridCols(groups.length);
   return (
     <div
-      className="h-full grid gap-[1vw]"
-      style={{
-        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-        gridAutoRows: "1fr",
-      }}
+      className="h-full rounded-2xl overflow-hidden flex flex-col border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black"
     >
-      {groups.map((g) => {
-        const groupTeams = teams.filter((t) => t.group_id === g.id);
-        const groupMatches = matches.filter((m) => m.group_id === g.id);
-        const standings = computeStandings(groupTeams, groupMatches, playerMap);
-        return (
-          <div
-            key={g.id}
-            className="relative rounded-2xl overflow-hidden flex flex-col border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black"
-          >
+      <div
+        className="px-[0.8vw] py-[0.7vh] flex items-center justify-between border-b border-white/10"
+        style={{ backgroundColor: `${accent}10` }}
+      >
+        <div
+          className="font-black tracking-tight uppercase"
+          style={{
+            fontSize: "clamp(0.7rem, 0.95vw, 1.05rem)",
+            color: accent,
+            letterSpacing: "0.1em",
+          }}
+        >
+          Tabell
+        </div>
+        <div
+          className="text-zinc-500 uppercase tracking-widest font-semibold tabular-nums"
+          style={{ fontSize: "clamp(0.5rem, 0.65vw, 0.8rem)" }}
+        >
+          # · LAG · GD
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 flex flex-col divide-y divide-white/5 overflow-hidden">
+        {groups.map((g) => {
+          const groupTeams = teams.filter((t) => t.group_id === g.id);
+          const groupMatches = matches.filter((m) => m.group_id === g.id);
+          const standings = computeStandings(groupTeams, groupMatches, playerMap);
+          return (
             <div
-              className="px-[1.2vw] py-[0.8vh] flex items-center justify-between border-b border-white/10"
-              style={{ backgroundColor: `${accent}10` }}
+              key={g.id}
+              className="flex-1 min-h-0 flex flex-col overflow-hidden"
             >
               <div
-                className="font-black tracking-tight"
-                style={{
-                  fontSize: "clamp(0.95rem, 1.5vw, 1.75rem)",
-                  color: accent,
-                }}
+                className="px-[0.8vw] py-[0.4vh] font-bold tracking-tight text-zinc-300 flex items-center justify-between"
+                style={{ fontSize: "clamp(0.75rem, 1vw, 1.15rem)" }}
               >
-                {g.name}
+                <span>{g.name}</span>
+                <span
+                  className="text-zinc-600 tabular-nums font-semibold"
+                  style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
+                >
+                  {standings.length}
+                </span>
               </div>
-              <div
-                className="text-zinc-500 uppercase tracking-widest font-semibold"
-                style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)" }}
-              >
-                Tabell
-              </div>
-            </div>
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <table className="w-full h-full table-fixed">
-                <thead>
-                  <tr
-                    className="text-zinc-500 uppercase tracking-wider"
-                    style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)" }}
+              <ul className="flex-1 min-h-0 flex flex-col">
+                {standings.map((s, i) => {
+                  const top = i === 0;
+                  return (
+                    <li
+                      key={s.team_id}
+                      className="flex-1 min-h-0 px-[0.8vw] flex items-center gap-2 border-t border-white/5"
+                      style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
+                    >
+                      <span
+                        className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.7em] h-[1.7em] font-black tabular-nums"
+                        style={
+                          top
+                            ? {
+                                backgroundColor: `${accent}25`,
+                                color: accent,
+                              }
+                            : { color: "#71717a" }
+                        }
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 min-w-0 font-semibold truncate">
+                        {s.teamName}
+                      </span>
+                      <span
+                        className="shrink-0 tabular-nums font-bold"
+                        style={{
+                          color:
+                            s.gd > 0
+                              ? accent
+                              : s.gd < 0
+                                ? "#f87171"
+                                : "#a1a1aa",
+                        }}
+                      >
+                        {s.gd > 0 ? `+${s.gd}` : s.gd}
+                      </span>
+                    </li>
+                  );
+                })}
+                {standings.length === 0 && (
+                  <li
+                    className="flex-1 flex items-center justify-center text-zinc-600 px-[0.8vw]"
+                    style={{ fontSize: "clamp(0.65rem, 0.85vw, 0.95rem)" }}
                   >
-                    <th className="w-[8%] py-[0.4vh] text-center">#</th>
-                    <th className="text-left py-[0.4vh] pl-2 font-semibold">
-                      Lag
-                    </th>
-                    <th className="w-[10%] py-[0.4vh] text-center">MP</th>
-                    <th className="w-[10%] py-[0.4vh] text-center">GF</th>
-                    <th className="w-[10%] py-[0.4vh] text-center">GA</th>
-                    <th className="w-[12%] py-[0.4vh] text-center">GD</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((s, i) => {
-                    const top = i === 0;
-                    return (
-                      <tr
-                        key={s.team_id}
-                        className="border-t border-white/5"
-                        style={{ fontSize: "clamp(0.75rem, 1.05vw, 1.25rem)" }}
-                      >
-                        <td className="py-[0.5vh] text-center font-black">
-                          <span
-                            className="inline-flex items-center justify-center rounded-full w-[2em] h-[2em]"
-                            style={
-                              top
-                                ? {
-                                    backgroundColor: `${accent}25`,
-                                    color: accent,
-                                  }
-                                : { color: "#71717a" }
-                            }
-                          >
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="py-[0.5vh] pl-2 font-semibold truncate">
-                          {s.teamName}
-                        </td>
-                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
-                          {s.mp}
-                        </td>
-                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
-                          {s.gf}
-                        </td>
-                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
-                          {s.ga}
-                        </td>
-                        <td
-                          className="py-[0.5vh] text-center tabular-nums font-bold"
-                          style={{
-                            color:
-                              s.gd > 0
-                                ? accent
-                                : s.gd < 0
-                                  ? "#f87171"
-                                  : "#a1a1aa",
-                          }}
-                        >
-                          {s.gd > 0 ? `+${s.gd}` : s.gd}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {standings.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="text-center text-zinc-600 py-6"
-                        style={{ fontSize: "clamp(0.75rem, 1.05vw, 1.2rem)" }}
-                      >
-                        Inga lag i denna grupp
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    Inga lag
+                  </li>
+                )}
+              </ul>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -796,15 +754,9 @@ function StandingsView({
 function Footer({
   tournament,
   tenant,
-  accent,
-  view,
-  showRotation,
 }: {
   tournament: Tournament;
   tenant: Tenant;
-  accent: string;
-  view: ViewMode;
-  showRotation: boolean;
 }) {
   return (
     <footer className="px-[2vw] py-[0.7vh] border-t border-white/10 flex items-center justify-between">
@@ -818,46 +770,12 @@ function Footer({
           Runda {tournament.current_round} av {tournament.total_rounds || "–"}
         </span>
       </div>
-      {showRotation ? (
-        <div
-          className="flex items-center gap-2 text-zinc-500 uppercase tracking-widest font-semibold"
-          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
-        >
-          <ViewDot active={view === "matches"} accent={accent} label="Matcher" />
-          <ViewDot active={view === "standings"} accent={accent} label="Tabeller" />
-        </div>
-      ) : (
-        <div
-          className="text-zinc-600 uppercase tracking-widest font-semibold"
-          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
-        >
-          smashboard
-        </div>
-      )}
+      <div
+        className="text-zinc-600 uppercase tracking-widest font-semibold"
+        style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
+      >
+        smashboard
+      </div>
     </footer>
-  );
-}
-
-function ViewDot({
-  active,
-  accent,
-  label,
-}: {
-  active: boolean;
-  accent: string;
-  label: string;
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className="inline-block w-1.5 h-1.5 rounded-full transition-colors"
-        style={{
-          backgroundColor: active ? accent : "rgba(255,255,255,0.2)",
-        }}
-      />
-      <span className={active ? "text-zinc-300" : "text-zinc-600"}>
-        {label}
-      </span>
-    </span>
   );
 }

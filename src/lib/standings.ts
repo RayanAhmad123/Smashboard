@@ -42,6 +42,22 @@ export function teamName(
   return `${p1?.name ?? "?"} & ${p2?.name ?? "?"}`;
 }
 
+export function shortName(player: Player | undefined | null): string {
+  if (!player) return "?";
+  const parts = player.name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  return `${first} ${last.charAt(0).toUpperCase()}.`;
+}
+
+export function shortTeamName(
+  team: TournamentTeam,
+  players: Map<string, Player>
+): string {
+  return `${shortName(players.get(team.player1_id))} & ${shortName(players.get(team.player2_id))}`;
+}
+
 export function computeStandings(
   teams: TournamentTeam[],
   matches: TournamentMatch[],

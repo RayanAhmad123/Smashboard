@@ -12,7 +12,12 @@ import type {
   Court,
   Player,
 } from "@/lib/supabase/types";
-import { computeStandings, stageLabel } from "@/lib/standings";
+import {
+  computeStandings,
+  stageLabel,
+  shortName,
+  shortTeamName,
+} from "@/lib/standings";
 
 type Loaded = {
   tournament: Tournament;
@@ -247,7 +252,7 @@ export function DisplayView({
         progress={progress}
       />
 
-      <main className="flex-1 min-h-0 px-[2vw] py-[1.5vh]">
+      <main className="flex-1 min-h-0 px-[1.5vw] py-[1vh]">
         {view === "matches" ? (
           <MatchesView
             courts={data.courts}
@@ -298,22 +303,22 @@ function Header({
   progress: number;
 }) {
   return (
-    <header className="px-[2.5vw] pt-[2vh] pb-[1.5vh] flex items-center justify-between gap-6 border-b border-white/10">
-      <div className="flex items-center gap-4 min-w-0">
+    <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-white/10">
+      <div className="flex items-center gap-3 min-w-0">
         {tenant.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={tenant.logo_url}
             alt=""
-            className="h-[6vh] w-auto object-contain"
+            className="h-[4.5vh] w-auto object-contain"
           />
         ) : (
           <div
-            className="h-[6vh] aspect-square rounded-xl flex items-center justify-center font-black"
+            className="h-[4.5vh] aspect-square rounded-lg flex items-center justify-center font-black"
             style={{
               backgroundColor: `${accent}20`,
               color: accent,
-              fontSize: "clamp(1.5rem, 2.5vw, 2.5rem)",
+              fontSize: "clamp(1.1rem, 1.8vw, 1.8rem)",
             }}
           >
             {tenant.name.charAt(0)}
@@ -322,13 +327,13 @@ function Header({
         <div className="min-w-0">
           <div
             className="font-black tracking-tight leading-none truncate"
-            style={{ fontSize: "clamp(1.75rem, 3.4vw, 4rem)" }}
+            style={{ fontSize: "clamp(1.2rem, 2.2vw, 2.5rem)" }}
           >
             {tournament.name}
           </div>
           <div
-            className="text-zinc-400 mt-1 flex items-center gap-2 truncate"
-            style={{ fontSize: "clamp(0.9rem, 1.2vw, 1.4rem)" }}
+            className="text-zinc-400 mt-0.5 flex items-center gap-1.5 truncate"
+            style={{ fontSize: "clamp(0.7rem, 0.9vw, 1rem)" }}
           >
             <span>{tenant.name}</span>
             <span className="text-zinc-600">·</span>
@@ -339,18 +344,18 @@ function Header({
         </div>
       </div>
 
-      <div className="flex items-center gap-[2vw] shrink-0">
+      <div className="flex items-center gap-[1.5vw] shrink-0">
         <div className="text-right">
           <div
             className="uppercase tracking-widest text-zinc-500 font-semibold"
-            style={{ fontSize: "clamp(0.65rem, 0.85vw, 1rem)" }}
+            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
           >
             Runda
           </div>
           <div
             className="font-black tabular-nums leading-none"
             style={{
-              fontSize: "clamp(2rem, 3.6vw, 4rem)",
+              fontSize: "clamp(1.4rem, 2.4vw, 2.6rem)",
               color: accent,
             }}
           >
@@ -360,21 +365,21 @@ function Header({
             </span>
           </div>
         </div>
-        <div className="hidden sm:flex flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
+        <div className="hidden sm:flex flex-col items-end gap-0.5">
+          <div className="flex items-center gap-1.5">
             <span
-              className="inline-block w-2.5 h-2.5 rounded-full animate-pulse"
+              className="inline-block w-2 h-2 rounded-full animate-pulse"
               style={{ backgroundColor: accent }}
             />
             <span
               className="uppercase tracking-widest font-semibold text-zinc-300"
-              style={{ fontSize: "clamp(0.65rem, 0.85vw, 1rem)" }}
+              style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
             >
               Live · {timeLabel}
             </span>
           </div>
           <div
-            className="h-1.5 w-[14vw] rounded-full bg-white/10 overflow-hidden"
+            className="h-1 w-[11vw] rounded-full bg-white/10 overflow-hidden"
             title={`${completed} av ${total} matcher klara`}
           >
             <div
@@ -384,7 +389,7 @@ function Header({
           </div>
           <div
             className="text-zinc-500 tabular-nums"
-            style={{ fontSize: "clamp(0.65rem, 0.85vw, 1rem)" }}
+            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
           >
             {completed} / {total} matcher
           </div>
@@ -432,7 +437,7 @@ function MatchesView({
   const cols = getGridCols(courts.length);
   return (
     <div
-      className="h-full grid gap-[1.5vw]"
+      className="h-full grid gap-[1vw]"
       style={{
         gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
         gridAutoRows: "1fr",
@@ -497,29 +502,29 @@ function CourtCard({
       />
 
       {/* top bar */}
-      <div className="relative px-[1.5vw] pt-[1.5vh] pb-[1vh] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="relative px-[1.2vw] pt-[1vh] pb-[0.6vh] flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div
-            className="rounded-lg px-3 py-1 font-black tracking-tight"
+            className="rounded-md px-2 py-0.5 font-black tracking-tight"
             style={{
               backgroundColor: `${accent}1f`,
               color: accent,
-              fontSize: "clamp(1.1rem, 1.9vw, 2.4rem)",
+              fontSize: "clamp(0.9rem, 1.4vw, 1.7rem)",
             }}
           >
             {court.name}
           </div>
           {live && (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-bold uppercase tracking-widest"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold uppercase tracking-widest"
               style={{
                 backgroundColor: `${accent}22`,
                 color: accent,
-                fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)",
+                fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)",
               }}
             >
               <span
-                className="inline-block w-2 h-2 rounded-full animate-pulse"
+                className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
                 style={{ backgroundColor: accent }}
               />
               Live
@@ -529,23 +534,23 @@ function CourtCard({
         {stage && (
           <div
             className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-300" : "text-zinc-400"}`}
-            style={{ fontSize: "clamp(0.75rem, 1.05vw, 1.3rem)" }}
+            style={{ fontSize: "clamp(0.6rem, 0.85vw, 1.05rem)" }}
           >
-            {isFinal && <span className="mr-1.5">★</span>}
+            {isFinal && <span className="mr-1">★</span>}
             {stage}
           </div>
         )}
       </div>
 
       {/* matchup */}
-      <div className="relative flex-1 min-h-0 px-[1.5vw] pb-[1.2vh] flex items-center">
+      <div className="relative flex-1 min-h-0 px-[1.2vw] pb-[0.8vh] flex items-center">
         {match && t1 && t2 ? (
-          <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[1vw]">
+          <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.8vw]">
             <TeamBlock team={t1} playerMap={playerMap} align="right" />
             <div className="flex flex-col items-center justify-center">
               <div
                 className="font-black text-zinc-500 leading-none"
-                style={{ fontSize: "clamp(1rem, 1.6vw, 2rem)" }}
+                style={{ fontSize: "clamp(0.8rem, 1.2vw, 1.5rem)" }}
               >
                 VS
               </div>
@@ -580,15 +585,15 @@ function TeamBlock({
     <div className={align === "right" ? "text-right" : "text-left"}>
       <div
         className="font-bold leading-tight truncate"
-        style={{ fontSize: "clamp(1.4rem, 2.6vw, 3.2rem)" }}
+        style={{ fontSize: "clamp(1rem, 1.8vw, 2.2rem)" }}
       >
-        {p1?.name ?? "?"}
+        {shortName(p1)}
       </div>
       <div
         className="font-bold leading-tight truncate text-zinc-200"
-        style={{ fontSize: "clamp(1.4rem, 2.6vw, 3.2rem)" }}
+        style={{ fontSize: "clamp(1rem, 1.8vw, 2.2rem)" }}
       >
-        {p2?.name ?? "?"}
+        {shortName(p2)}
       </div>
     </div>
   );
@@ -596,18 +601,18 @@ function TeamBlock({
 
 function DoneState() {
   return (
-    <div className="w-full flex flex-col items-center justify-center text-zinc-600 gap-2">
+    <div className="w-full flex flex-col items-center justify-center text-zinc-600 gap-1.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/icons/icon-trophy.svg"
         alt=""
         aria-hidden="true"
         className="opacity-50"
-        style={{ width: "clamp(3rem, 6vw, 6rem)", height: "auto" }}
+        style={{ width: "clamp(2rem, 4vw, 4.5rem)", height: "auto" }}
       />
       <div
         className="font-black tracking-tight"
-        style={{ fontSize: "clamp(1.5rem, 3vw, 3.5rem)" }}
+        style={{ fontSize: "clamp(1rem, 2vw, 2.4rem)" }}
       >
         Klar
       </div>
@@ -627,23 +632,21 @@ function NextUp({
   const t1 = teamMap.get(match.team1_id);
   const t2 = teamMap.get(match.team2_id);
   if (!t1 || !t2) return null;
-  const team = (t: TournamentTeam) =>
-    `${playerMap.get(t.player1_id)?.name ?? "?"} & ${
-      playerMap.get(t.player2_id)?.name ?? "?"
-    }`;
   return (
-    <div className="relative border-t border-white/5 px-[1.5vw] py-[0.9vh] flex items-center gap-3 text-zinc-400">
+    <div className="relative border-t border-white/5 px-[1.2vw] py-[0.7vh] flex items-center gap-3 text-zinc-400">
       <span
         className="uppercase tracking-widest font-bold text-zinc-500"
-        style={{ fontSize: "clamp(0.6rem, 0.8vw, 0.9rem)" }}
+        style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
       >
         Nästa
       </span>
       <span
         className="truncate"
-        style={{ fontSize: "clamp(0.85rem, 1.15vw, 1.4rem)" }}
+        style={{ fontSize: "clamp(0.7rem, 0.9vw, 1.1rem)" }}
       >
-        {team(t1)} <span className="text-zinc-600">vs</span> {team(t2)}
+        {shortTeamName(t1, playerMap)}{" "}
+        <span className="text-zinc-600">vs</span>{" "}
+        {shortTeamName(t2, playerMap)}
       </span>
     </div>
   );
@@ -665,7 +668,7 @@ function StandingsView({
   const cols = getGridCols(groups.length);
   return (
     <div
-      className="h-full grid gap-[1.5vw]"
+      className="h-full grid gap-[1vw]"
       style={{
         gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
         gridAutoRows: "1fr",
@@ -678,16 +681,16 @@ function StandingsView({
         return (
           <div
             key={g.id}
-            className="relative rounded-3xl overflow-hidden flex flex-col border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black"
+            className="relative rounded-2xl overflow-hidden flex flex-col border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black"
           >
             <div
-              className="px-[1.5vw] py-[1.2vh] flex items-center justify-between border-b border-white/10"
+              className="px-[1.2vw] py-[0.8vh] flex items-center justify-between border-b border-white/10"
               style={{ backgroundColor: `${accent}10` }}
             >
               <div
                 className="font-black tracking-tight"
                 style={{
-                  fontSize: "clamp(1.2rem, 2vw, 2.4rem)",
+                  fontSize: "clamp(0.95rem, 1.5vw, 1.75rem)",
                   color: accent,
                 }}
               >
@@ -695,7 +698,7 @@ function StandingsView({
               </div>
               <div
                 className="text-zinc-500 uppercase tracking-widest font-semibold"
-                style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
+                style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)" }}
               >
                 Tabell
               </div>
@@ -705,16 +708,16 @@ function StandingsView({
                 <thead>
                   <tr
                     className="text-zinc-500 uppercase tracking-wider"
-                    style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
+                    style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)" }}
                   >
-                    <th className="w-[8%] py-[0.6vh] text-center">#</th>
-                    <th className="text-left py-[0.6vh] pl-2 font-semibold">
+                    <th className="w-[8%] py-[0.4vh] text-center">#</th>
+                    <th className="text-left py-[0.4vh] pl-2 font-semibold">
                       Lag
                     </th>
-                    <th className="w-[10%] py-[0.6vh] text-center">MP</th>
-                    <th className="w-[10%] py-[0.6vh] text-center">GF</th>
-                    <th className="w-[10%] py-[0.6vh] text-center">GA</th>
-                    <th className="w-[12%] py-[0.6vh] text-center">GD</th>
+                    <th className="w-[10%] py-[0.4vh] text-center">MP</th>
+                    <th className="w-[10%] py-[0.4vh] text-center">GF</th>
+                    <th className="w-[10%] py-[0.4vh] text-center">GA</th>
+                    <th className="w-[12%] py-[0.4vh] text-center">GD</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -724,11 +727,11 @@ function StandingsView({
                       <tr
                         key={s.team_id}
                         className="border-t border-white/5"
-                        style={{ fontSize: "clamp(0.95rem, 1.4vw, 1.7rem)" }}
+                        style={{ fontSize: "clamp(0.75rem, 1.05vw, 1.25rem)" }}
                       >
-                        <td className="py-[0.7vh] text-center font-black">
+                        <td className="py-[0.5vh] text-center font-black">
                           <span
-                            className="inline-flex items-center justify-center rounded-full w-[2.2em] h-[2.2em]"
+                            className="inline-flex items-center justify-center rounded-full w-[2em] h-[2em]"
                             style={
                               top
                                 ? {
@@ -741,20 +744,20 @@ function StandingsView({
                             {i + 1}
                           </span>
                         </td>
-                        <td className="py-[0.7vh] pl-2 font-semibold truncate">
+                        <td className="py-[0.5vh] pl-2 font-semibold truncate">
                           {s.teamName}
                         </td>
-                        <td className="py-[0.7vh] text-center tabular-nums text-zinc-300">
+                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
                           {s.mp}
                         </td>
-                        <td className="py-[0.7vh] text-center tabular-nums text-zinc-300">
+                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
                           {s.gf}
                         </td>
-                        <td className="py-[0.7vh] text-center tabular-nums text-zinc-300">
+                        <td className="py-[0.5vh] text-center tabular-nums text-zinc-300">
                           {s.ga}
                         </td>
                         <td
-                          className="py-[0.7vh] text-center tabular-nums font-bold"
+                          className="py-[0.5vh] text-center tabular-nums font-bold"
                           style={{
                             color:
                               s.gd > 0
@@ -773,8 +776,8 @@ function StandingsView({
                     <tr>
                       <td
                         colSpan={6}
-                        className="text-center text-zinc-600 py-8"
-                        style={{ fontSize: "clamp(0.95rem, 1.4vw, 1.5rem)" }}
+                        className="text-center text-zinc-600 py-6"
+                        style={{ fontSize: "clamp(0.75rem, 1.05vw, 1.2rem)" }}
                       >
                         Inga lag i denna grupp
                       </td>
@@ -804,10 +807,10 @@ function Footer({
   showRotation: boolean;
 }) {
   return (
-    <footer className="px-[2.5vw] py-[1vh] border-t border-white/10 flex items-center justify-between">
+    <footer className="px-[2vw] py-[0.7vh] border-t border-white/10 flex items-center justify-between">
       <div
-        className="text-zinc-500 uppercase tracking-widest font-semibold flex items-center gap-3"
-        style={{ fontSize: "clamp(0.6rem, 0.85vw, 0.95rem)" }}
+        className="text-zinc-500 uppercase tracking-widest font-semibold flex items-center gap-2"
+        style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
       >
         <span className="text-zinc-300">{tenant.name}</span>
         <span className="text-zinc-700">·</span>
@@ -817,8 +820,8 @@ function Footer({
       </div>
       {showRotation ? (
         <div
-          className="flex items-center gap-3 text-zinc-500 uppercase tracking-widest font-semibold"
-          style={{ fontSize: "clamp(0.6rem, 0.85vw, 0.95rem)" }}
+          className="flex items-center gap-2 text-zinc-500 uppercase tracking-widest font-semibold"
+          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
         >
           <ViewDot active={view === "matches"} accent={accent} label="Matcher" />
           <ViewDot active={view === "standings"} accent={accent} label="Tabeller" />
@@ -826,7 +829,7 @@ function Footer({
       ) : (
         <div
           className="text-zinc-600 uppercase tracking-widest font-semibold"
-          style={{ fontSize: "clamp(0.6rem, 0.85vw, 0.95rem)" }}
+          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
         >
           smashboard
         </div>

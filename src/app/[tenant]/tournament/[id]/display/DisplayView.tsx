@@ -7,13 +7,15 @@ import type {
   Tournament,
   TournamentMatch,
   TournamentTeam,
+  TournamentGroup,
   Court,
   Player,
 } from "@/lib/supabase/types";
-import { teamName } from "@/lib/standings";
+import { teamName, stageLabel } from "@/lib/standings";
 
 type Loaded = {
   tournament: Tournament;
+  groups: TournamentGroup[];
   matches: TournamentMatch[];
   teams: TournamentTeam[];
   players: Player[];
@@ -32,12 +34,17 @@ export function DisplayView({
   const [data, setData] = useState<Loaded | null>(null);
 
   const load = useCallback(async () => {
-    const [tRes, mRes, teamsRes, courtsRes] = await Promise.all([
+    const [tRes, gRes, mRes, teamsRes, courtsRes] = await Promise.all([
       supabaseClient
         .from("tournaments")
         .select("*")
         .eq("id", tournamentId)
         .single(),
+      supabaseClient
+        .from("tournament_groups")
+        .select("*")
+        .eq("tournament_id", tournamentId)
+        .order("sort_order"),
       supabaseClient
         .from("tournament_matches")
         .select("*")
@@ -52,7 +59,14 @@ export function DisplayView({
         .eq("tenant_id", tenant.id)
         .order("sort_order"),
     ]);
-    if (tRes.error || mRes.error || teamsRes.error || courtsRes.error) return;
+    if (
+      tRes.error ||
+      gRes.error ||
+      mRes.error ||
+      teamsRes.error ||
+      courtsRes.error
+    )
+      return;
     const teams = (teamsRes.data ?? []) as TournamentTeam[];
     const playerIds = Array.from(
       new Set(teams.flatMap((t) => [t.player1_id, t.player2_id]))
@@ -63,6 +77,7 @@ export function DisplayView({
     if (playersRes.error) return;
     setData({
       tournament: tRes.data as Tournament,
+      groups: (gRes.data ?? []) as TournamentGroup[],
       matches: (mRes.data ?? []) as TournamentMatch[],
       teams,
       players: (playersRes.data ?? []) as Player[],
@@ -82,15 +97,20 @@ export function DisplayView({
     for (const p of data.players) playerMap.set(p.id, p);
     const teamMap = new Map<string, TournamentTeam>();
     for (const t of data.teams) teamMap.set(t.id, t);
-    const currentRound = data.tournament.current_round;
-    const currentMatches = data.matches.filter(
-      (m) => m.round_number === currentRound
-    );
+    const groupMap = new Map<string, TournamentGroup>();
+    for (const g of data.groups) groupMap.set(g.id, g);
     const byCourt = new Map<string, TournamentMatch>();
-    for (const m of currentMatches) {
-      if (m.court_id) byCourt.set(m.court_id, m);
+    for (const c of data.courts) {
+      const queued = data.matches
+        .filter((m) => m.court_id === c.id && m.status === "scheduled")
+        .sort(
+          (a, b) =>
+            a.round_number - b.round_number ||
+            a.created_at.localeCompare(b.created_at)
+        );
+      if (queued[0]) byCourt.set(c.id, queued[0]);
     }
-    return { playerMap, teamMap, currentRound, byCourt };
+    return { playerMap, teamMap, groupMap, byCourt };
   }, [data]);
 
   const accent = tenant.primary_color || "#10b981";
@@ -126,11 +146,11 @@ export function DisplayView({
         <div
           className="font-bold"
           style={{
-            fontSize: "clamp(2rem, 4vw, 4.5rem)",
+            fontSize: "clamp(1.5rem, 2.5vw, 3rem)",
             color: accent,
           }}
         >
-          Runda {view.currentRound} / {data.tournament.total_rounds}
+          Mål {data.tournament.games_per_match} game
         </div>
       </header>
 
@@ -147,6 +167,7 @@ export function DisplayView({
           const m = view.byCourt.get(court.id);
           const t1 = m ? view.teamMap.get(m.team1_id) : null;
           const t2 = m ? view.teamMap.get(m.team2_id) : null;
+          const stage = m ? stageLabel(m, view.groupMap) : null;
           return (
             <div
               key={court.id}
@@ -156,14 +177,24 @@ export function DisplayView({
                 minHeight: "30vh",
               }}
             >
-              <div
-                className="font-bold"
-                style={{
-                  fontSize: "clamp(1.5rem, 3vw, 3.5rem)",
-                  color: accent,
-                }}
-              >
-                {court.name}
+              <div className="flex justify-between items-baseline">
+                <div
+                  className="font-bold"
+                  style={{
+                    fontSize: "clamp(1.5rem, 3vw, 3.5rem)",
+                    color: accent,
+                  }}
+                >
+                  {court.name}
+                </div>
+                {stage && (
+                  <div
+                    className="text-zinc-400 font-semibold"
+                    style={{ fontSize: "clamp(0.875rem, 1.5vw, 1.75rem)" }}
+                  >
+                    {stage}
+                  </div>
+                )}
               </div>
               {m && t1 && t2 ? (
                 <div className="flex flex-col gap-[1vw] mt-[1vw]">
@@ -185,23 +216,13 @@ export function DisplayView({
                   >
                     {teamName(t2, view.playerMap)}
                   </div>
-                  {m.status === "completed" &&
-                    m.score_team1 != null &&
-                    m.score_team2 != null && (
-                      <div
-                        className="mt-[1vw] text-zinc-300"
-                        style={{ fontSize: "clamp(1rem, 1.8vw, 2.25rem)" }}
-                      >
-                        {m.score_team1} – {m.score_team2}
-                      </div>
-                    )}
                 </div>
               ) : (
                 <div
                   className="text-zinc-700"
                   style={{ fontSize: "clamp(2rem, 5vw, 6rem)" }}
                 >
-                  –
+                  Klar
                 </div>
               )}
             </div>

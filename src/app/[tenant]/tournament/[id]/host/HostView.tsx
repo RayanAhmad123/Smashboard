@@ -9,13 +9,11 @@ import type {
   TournamentMatch,
   TournamentTeam,
   TournamentGroup,
+  Court,
   Player,
 } from "@/lib/supabase/types";
-import {
-  updateMatchScore,
-  advanceToNextRound,
-} from "@/lib/db/matches";
-import { computeStandings, teamName } from "@/lib/standings";
+import { updateMatchScore } from "@/lib/db/matches";
+import { computeStandings, teamName, stageLabel } from "@/lib/standings";
 
 type Loaded = {
   tournament: Tournament;
@@ -23,7 +21,7 @@ type Loaded = {
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   players: Player[];
-  courts: Map<string, string>;
+  courts: Court[];
 };
 
 export function HostView({
@@ -60,7 +58,11 @@ export function HostView({
           .eq("tournament_id", tournamentId)
           .order("round_number")
           .order("created_at"),
-        supabaseClient.from("courts").select("*").eq("tenant_id", tenant.id),
+        supabaseClient
+          .from("courts")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .order("sort_order"),
       ]);
       if (tRes.error) throw tRes.error;
       if (gRes.error) throw gRes.error;
@@ -77,16 +79,13 @@ export function HostView({
         : { data: [], error: null };
       if (playersRes.error) throw playersRes.error;
 
-      const courtsMap = new Map<string, string>();
-      for (const c of courtsRes.data ?? []) courtsMap.set(c.id, c.name);
-
       setData({
         tournament: tRes.data as Tournament,
         groups: (gRes.data ?? []) as TournamentGroup[],
         teams,
         matches: (matchesRes.data ?? []) as TournamentMatch[],
         players: (playersRes.data ?? []) as Player[],
-        courts: courtsMap,
+        courts: (courtsRes.data ?? []) as Court[],
       });
     } catch (e) {
       setErr((e as Error).message);
@@ -140,13 +139,26 @@ function HostInner({
     for (const t of teams) m.set(t.id, t);
     return m;
   }, [teams]);
+  const groupMap = useMemo(() => {
+    const m = new Map<string, TournamentGroup>();
+    for (const g of groups) m.set(g.id, g);
+    return m;
+  }, [groups]);
 
-  const currentMatches = matches.filter(
-    (m) => m.round_number === tournament.current_round
-  );
-  const allCurrentDone =
-    currentMatches.length > 0 &&
-    currentMatches.every((m) => m.status === "completed");
+  const activeByCourt = useMemo(() => {
+    const m = new Map<string, TournamentMatch>();
+    for (const c of courts) {
+      const queued = matches
+        .filter((mm) => mm.court_id === c.id && mm.status === "scheduled")
+        .sort(
+          (a, b) =>
+            a.round_number - b.round_number ||
+            a.created_at.localeCompare(b.created_at)
+        );
+      if (queued[0]) m.set(c.id, queued[0]);
+    }
+    return m;
+  }, [courts, matches]);
 
   async function saveScore(
     match: TournamentMatch,
@@ -162,24 +174,13 @@ function HostInner({
     }
   }
 
-  async function nextRound() {
-    setBusy("advance");
-    try {
-      await advanceToNextRound(tournament.id, tournament.current_round + 1);
-      await reload();
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <header className="border-b border-zinc-200 dark:border-zinc-800 px-8 py-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{tournament.name}</h1>
           <p className="text-sm text-zinc-500">
-            {tenant.name} · Runda {tournament.current_round} av{" "}
-            {tournament.total_rounds}
+            {tenant.name} · Mål {tournament.games_per_match} game
           </p>
         </div>
         <div className="flex gap-2">
@@ -190,44 +191,46 @@ function HostInner({
           >
             Öppna TV-visning
           </Link>
-          <button
-            onClick={nextRound}
-            disabled={
-              !allCurrentDone ||
-              busy !== null ||
-              tournament.current_round >= tournament.total_rounds
-            }
-            className="px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium disabled:opacity-40"
-          >
-            Nästa runda →
-          </button>
         </div>
       </header>
 
       <main className="p-8 grid lg:grid-cols-2 gap-8">
         <section>
-          <h2 className="text-lg font-semibold mb-4">
-            Matcher i runda {tournament.current_round}
-          </h2>
+          <h2 className="text-lg font-semibold mb-4">Aktiva matcher</h2>
           <div className="space-y-3">
-            {currentMatches.length === 0 && (
-              <div className="text-sm text-zinc-500">
-                Inga matcher i denna runda.
-              </div>
+            {courts.length === 0 && (
+              <div className="text-sm text-zinc-500">Inga banor.</div>
             )}
-            {currentMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                team1={teamMap.get(m.team1_id)!}
-                team2={teamMap.get(m.team2_id)!}
-                playerMap={playerMap}
-                courtName={m.court_id ? courts.get(m.court_id) : null}
-                onSave={(s1, s2) => saveScore(m, s1, s2)}
-                busy={busy === m.id}
-                gamesPerMatch={tournament.games_per_match}
-              />
-            ))}
+            {courts.map((c) => {
+              const m = activeByCourt.get(c.id);
+              if (!m) {
+                return (
+                  <div
+                    key={c.id}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"
+                  >
+                    <div className="flex justify-between items-center text-xs text-zinc-500">
+                      <span className="font-medium">{c.name}</span>
+                      <span>Klar – inga fler matcher</span>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <MatchCard
+                  key={c.id}
+                  match={m}
+                  team1={teamMap.get(m.team1_id)!}
+                  team2={teamMap.get(m.team2_id)!}
+                  playerMap={playerMap}
+                  courtName={c.name}
+                  stage={stageLabel(m, groupMap)}
+                  onSave={(s1, s2) => saveScore(m, s1, s2)}
+                  busy={busy === m.id}
+                  gamesPerMatch={tournament.games_per_match}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -299,6 +302,7 @@ function MatchCard({
   team2,
   playerMap,
   courtName,
+  stage,
   onSave,
   busy,
   gamesPerMatch,
@@ -307,7 +311,8 @@ function MatchCard({
   team1: TournamentTeam;
   team2: TournamentTeam;
   playerMap: Map<string, Player>;
-  courtName: string | null | undefined;
+  courtName: string;
+  stage: string;
   onSave: (s1: number, s2: number) => Promise<void>;
   busy: boolean;
   gamesPerMatch: number;
@@ -318,20 +323,27 @@ function MatchCard({
   const [s2, setS2] = useState<string>(
     match.score_team2 != null ? String(match.score_team2) : ""
   );
+  const [validationErr, setValidationErr] = useState<string | null>(null);
 
-  const completed = match.status === "completed";
+  const a = parseInt(s1, 10);
+  const b = parseInt(s2, 10);
+  const bothFilled = !Number.isNaN(a) && !Number.isNaN(b);
+  const isValid =
+    bothFilled &&
+    a >= 0 &&
+    b >= 0 &&
+    ((a === gamesPerMatch && b < a) || (b === gamesPerMatch && a < b));
 
   return (
-    <div
-      className={`rounded-lg border bg-white dark:bg-zinc-900 p-4 ${
-        completed
-          ? "border-emerald-200 dark:border-emerald-900"
-          : "border-zinc-200 dark:border-zinc-800"
-      }`}
-    >
+    <div className="rounded-lg border bg-white dark:bg-zinc-900 p-4 border-zinc-200 dark:border-zinc-800">
       <div className="flex justify-between items-center text-xs text-zinc-500 mb-3">
-        <span>{courtName ?? "Ingen bana"}</span>
-        <span>Mål {gamesPerMatch}</span>
+        <span className="font-medium">{courtName}</span>
+        <div className="flex items-center gap-3">
+          <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+            {stage}
+          </span>
+          <span>Mål {gamesPerMatch}</span>
+        </div>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
         <div className="text-sm font-medium text-right">
@@ -341,8 +353,13 @@ function MatchCard({
           <input
             type="number"
             inputMode="numeric"
+            min={0}
+            max={gamesPerMatch}
             value={s1}
-            onChange={(e) => setS1(e.target.value)}
+            onChange={(e) => {
+              setS1(e.target.value);
+              setValidationErr(null);
+            }}
             className="w-14 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-transparent text-center"
             disabled={busy}
           />
@@ -350,30 +367,38 @@ function MatchCard({
           <input
             type="number"
             inputMode="numeric"
+            min={0}
+            max={gamesPerMatch}
             value={s2}
-            onChange={(e) => setS2(e.target.value)}
+            onChange={(e) => {
+              setS2(e.target.value);
+              setValidationErr(null);
+            }}
             className="w-14 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-transparent text-center"
             disabled={busy}
           />
         </div>
         <div className="text-sm font-medium">{teamName(team2, playerMap)}</div>
       </div>
+      {validationErr && (
+        <div className="mt-2 text-xs text-red-600">{validationErr}</div>
+      )}
       <div className="mt-3 flex justify-end">
         <button
           onClick={() => {
-            const a = parseInt(s1, 10);
-            const b = parseInt(s2, 10);
-            if (Number.isNaN(a) || Number.isNaN(b)) return;
+            if (!bothFilled) return;
+            if (!isValid) {
+              setValidationErr(
+                `Vinnaren måste ha exakt ${gamesPerMatch} game.`
+              );
+              return;
+            }
             void onSave(a, b);
           }}
-          disabled={busy || s1 === "" || s2 === ""}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-            completed
-              ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
-              : "bg-emerald-600 text-white"
-          } disabled:opacity-50`}
+          disabled={busy || !bothFilled}
+          className="px-3 py-1.5 rounded-md text-xs font-medium bg-emerald-600 text-white disabled:opacity-50"
         >
-          {completed ? "Uppdatera" : "Klar"}
+          Klar
         </button>
       </div>
     </div>

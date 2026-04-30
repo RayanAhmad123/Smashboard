@@ -1,22 +1,18 @@
 import type {
-  Player,
   Court,
   TournamentTeam,
   TournamentGroup,
   TournamentMatch,
-  GroupFormation,
 } from "../supabase/types";
 
-export type DraftedTeam = {
+export type ManualTeamInput = {
   player1_id: string;
   player2_id: string;
-  seed: number;
-  combinedLevel: number;
 };
 
-export type GroupPlan = {
+export type GroupAssignment = {
   group: Omit<TournamentGroup, "id" | "tournament_id">;
-  teams: DraftedTeam[];
+  teams: ManualTeamInput[];
 };
 
 function shuffle<T>(arr: T[]): T[] {
@@ -28,73 +24,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function pairSeeded(sortedDesc: Player[]): DraftedTeam[] {
-  const teams: DraftedTeam[] = [];
-  const n = sortedDesc.length;
-  for (let i = 0; i < n / 2; i++) {
-    const p1 = sortedDesc[i];
-    const p2 = sortedDesc[n - 1 - i];
-    teams.push({
-      player1_id: p1.id,
-      player2_id: p2.id,
-      seed: i + 1,
-      combinedLevel: p1.level + p2.level,
-    });
-  }
-  return teams;
-}
-
-function pairConsecutive(players: Player[]): DraftedTeam[] {
-  const teams: DraftedTeam[] = [];
-  for (let i = 0; i < players.length; i += 2) {
-    const p1 = players[i];
-    const p2 = players[i + 1];
-    teams.push({
-      player1_id: p1.id,
-      player2_id: p2.id,
-      seed: i / 2 + 1,
-      combinedLevel: p1.level + p2.level,
-    });
-  }
-  return teams;
-}
-
-function snakeDraft(teams: DraftedTeam[], numGroups: number): DraftedTeam[][] {
-  const groups: DraftedTeam[][] = Array.from({ length: numGroups }, () => []);
-  teams.forEach((team, idx) => {
-    const round = Math.floor(idx / numGroups);
-    const pos = idx % numGroups;
-    const groupIdx = round % 2 === 0 ? pos : numGroups - 1 - pos;
-    groups[groupIdx].push(team);
+export function distributeTeamsToGroups(
+  teams: ManualTeamInput[],
+  numGroups: number
+): GroupAssignment[] {
+  const shuffled = shuffle(teams);
+  const buckets: ManualTeamInput[][] = Array.from(
+    { length: numGroups },
+    () => []
+  );
+  shuffled.forEach((team, idx) => {
+    buckets[idx % numGroups].push(team);
   });
-  return groups;
-}
-
-export function generateGroups(
-  players: Player[],
-  numGroups: number,
-  formation: GroupFormation
-): GroupPlan[] {
-  if (players.length < numGroups * 2 * 2) {
-    // need at least 2 teams per group → 4 players per group
-    // Allow smaller groups but warn the caller upstream. Don't hard-fail here.
-  }
-  if (players.length % 2 !== 0) {
-    throw new Error("Player count must be even to form pairs.");
-  }
-
-  let teams: DraftedTeam[];
-  if (formation === "seeded") {
-    const sorted = [...players].sort((a, b) => b.level - a.level);
-    teams = pairSeeded(sorted);
-    teams.sort((a, b) => b.combinedLevel - a.combinedLevel);
-  } else {
-    teams = pairConsecutive(shuffle(players));
-  }
-
-  const grouped = snakeDraft(teams, numGroups);
-
-  return grouped.map((teamsInGroup, idx) => ({
+  return buckets.map((teamsInGroup, idx) => ({
     group: {
       name: `Grupp ${String.fromCharCode(65 + idx)}`,
       sort_order: idx,
@@ -104,14 +46,12 @@ export function generateGroups(
 }
 
 function roundRobinPairs(numTeams: number): Array<Array<[number, number] | null>> {
-  // Returns rounds[]; each round is a list of pairs of indices, possibly with byes.
   const teams = Array.from({ length: numTeams }, (_, i) => i);
   const hasBye = teams.length % 2 === 1;
   if (hasBye) teams.push(-1);
   const n = teams.length;
   const rounds: Array<Array<[number, number] | null>> = [];
 
-  // Circle method
   const fixed = teams[0];
   let rotating = teams.slice(1);
 
@@ -128,7 +68,6 @@ function roundRobinPairs(numTeams: number): Array<Array<[number, number] | null>
       }
     }
     rounds.push(round);
-    // rotate
     rotating = [rotating[rotating.length - 1], ...rotating.slice(0, -1)];
   }
 
@@ -146,7 +85,6 @@ export function generateGroupMatches(
   }
 
   const groupIds = Array.from(teamsByGroup.keys());
-  // Build per-group schedules
   const perGroup = groupIds.map((gid) => {
     const teams = teamsByGroup.get(gid)!;
     const rounds = roundRobinPairs(teams.length);
@@ -170,18 +108,19 @@ export function generateGroupMatches(
     for (let g = 0; g < perGroup.length; g++) {
       const groupRound = perGroup[g][r] ?? [];
       for (const m of groupRound) {
-        const court = courtIdx < courts.length ? courts[courtIdx] : null;
+        const court = courts[courtIdx % courts.length];
         courtIdx++;
         matches.push({
           tournament_id: m.tournament_id,
           group_id: m.group_id,
           round_number: r + 1,
-          court_id: court ? court.id : null,
+          court_id: court.id,
           team1_id: m.team1_id,
           team2_id: m.team2_id,
           score_team1: null,
           score_team2: null,
           status: "scheduled",
+          stage: "group",
         });
       }
     }
@@ -191,6 +130,7 @@ export function generateGroupMatches(
 }
 
 export function totalRoundsFor(numTeamsPerGroup: number[]): number {
+  if (numTeamsPerGroup.length === 0) return 1;
   return Math.max(
     ...numTeamsPerGroup.map((n) => (n % 2 === 0 ? n - 1 : n))
   );

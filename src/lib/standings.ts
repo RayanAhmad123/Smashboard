@@ -1,8 +1,28 @@
 import type {
   TournamentMatch,
   TournamentTeam,
+  TournamentGroup,
   Player,
 } from "./supabase/types";
+
+export function stageLabel(
+  match: TournamentMatch,
+  groups: Map<string, TournamentGroup>
+): string {
+  switch (match.stage) {
+    case "quarter_final":
+      return "Kvartsfinal";
+    case "semi_final":
+      return "Semifinal";
+    case "bronze":
+      return "Bronsmatch";
+    case "final":
+      return "Final";
+    case "group":
+    default:
+      return match.group_id ? (groups.get(match.group_id)?.name ?? "Grupp") : "Grupp";
+  }
+}
 
 export type TeamStanding = {
   team_id: string;

@@ -54,13 +54,3 @@ export async function updateMatchScore(
   return data as TournamentMatch;
 }
 
-export async function advanceToNextRound(
-  tournamentId: string,
-  nextRound: number
-): Promise<void> {
-  const { error } = await supabaseClient
-    .from("tournaments")
-    .update({ current_round: nextRound })
-    .eq("id", tournamentId);
-  if (error) throw error;
-}

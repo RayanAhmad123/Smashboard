@@ -6,7 +6,6 @@ import type {
   Player,
   Court,
   Tenant,
-  GroupFormation,
   TournamentFormat,
 } from "@/lib/supabase/types";
 import {
@@ -16,12 +15,14 @@ import {
   insertMatches,
 } from "@/lib/db/tournaments";
 import {
-  generateGroups,
+  distributeTeamsToGroups,
   generateGroupMatches,
   totalRoundsFor,
 } from "@/lib/algorithms/gruppspel";
 
 type Step = 1 | 2 | 3;
+
+type TeamSlot = { p1: string | null; p2: string | null };
 
 export function NewTournamentWizard({
   tenant,
@@ -38,13 +39,14 @@ export function NewTournamentWizard({
   // Step 1
   const [name, setName] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("gruppspel");
-  const [formation, setFormation] = useState<GroupFormation>("seeded");
   const [numGroups, setNumGroups] = useState(2);
-  const [gamesPerMatch, setGamesPerMatch] = useState(32);
+  const [gamesPerMatch, setGamesPerMatch] = useState(24);
 
-  // Step 2
-  const [search, setSearch] = useState("");
-  const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
+  // Step 2 — manual team builder
+  const [teamSlots, setTeamSlots] = useState<TeamSlot[]>([
+    { p1: null, p2: null },
+    { p1: null, p2: null },
+  ]);
 
   // Step 3
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
@@ -54,28 +56,46 @@ export function NewTournamentWizard({
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const filteredPlayers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return players;
-    return players.filter((p) => p.name.toLowerCase().includes(q));
-  }, [players, search]);
+  const playerMap = useMemo(() => {
+    const m = new Map<string, Player>();
+    for (const p of players) m.set(p.id, p);
+    return m;
+  }, [players]);
 
-  const selCount = selectedPlayers.size;
-  const selCourtCount = selectedCourts.size;
-  const evenCount = selCount % 2 === 0;
-  const minPlayers = 4;
+  const assignedSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of teamSlots) {
+      if (t.p1) s.add(t.p1);
+      if (t.p2) s.add(t.p2);
+    }
+    return s;
+  }, [teamSlots]);
 
-  const canStep1 = name.trim().length > 0;
-  const canStep2 = selCount >= minPlayers && evenCount;
-  const canStep3 = selCourtCount >= 1;
+  const unassignedPlayers = useMemo(
+    () => players.filter((p) => !assignedSet.has(p.id)),
+    [players, assignedSet]
+  );
 
-  function togglePlayer(id: string) {
-    setSelectedPlayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const completeTeams = teamSlots.filter(
+    (t) => t.p1 && t.p2 && t.p1 !== t.p2
+  );
+  const allSlotsComplete =
+    teamSlots.length > 0 && completeTeams.length === teamSlots.length;
+
+  const canStep1 = name.trim().length > 0 && gamesPerMatch >= 1;
+  const canStep2 = teamSlots.length >= numGroups && allSlotsComplete;
+  const canStep3 = selectedCourts.size >= 1;
+
+  function addTeam() {
+    setTeamSlots((prev) => [...prev, { p1: null, p2: null }]);
+  }
+  function removeTeam(idx: number) {
+    setTeamSlots((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function setSlot(idx: number, slot: "p1" | "p2", value: string) {
+    setTeamSlots((prev) =>
+      prev.map((t, i) => (i === idx ? { ...t, [slot]: value || null } : t))
+    );
   }
 
   function toggleCourt(id: string) {
@@ -91,10 +111,19 @@ export function NewTournamentWizard({
     setErr(null);
     setSubmitting(true);
     try {
-      const chosenPlayers = players.filter((p) => selectedPlayers.has(p.id));
       const chosenCourts = courts.filter((c) => selectedCourts.has(c.id));
 
-      const plan = generateGroups(chosenPlayers, numGroups, formation);
+      const manualTeams = completeTeams.map((t) => ({
+        player1_id: t.p1!,
+        player2_id: t.p2!,
+      }));
+
+      const plan = distributeTeamsToGroups(manualTeams, numGroups).filter(
+        (g) => g.teams.length > 0
+      );
+      if (plan.length === 0) {
+        throw new Error("Inga lag att fördela.");
+      }
       const teamsPerGroup = plan.map((g) => g.teams.length);
       const totalRounds = totalRoundsFor(teamsPerGroup);
 
@@ -102,8 +131,8 @@ export function NewTournamentWizard({
         tenant_id: tenant.id,
         name: name.trim(),
         format,
-        formation,
-        num_groups: numGroups,
+        formation: "random",
+        num_groups: plan.length,
         games_per_match: gamesPerMatch,
         total_rounds: totalRounds,
       });
@@ -123,7 +152,7 @@ export function NewTournamentWizard({
           group_id: groupId,
           player1_id: t.player1_id,
           player2_id: t.player2_id,
-          seed: t.seed,
+          seed: null,
         }));
       });
       const insertedTeams = await insertTeams(teamRows);
@@ -167,7 +196,7 @@ export function NewTournamentWizard({
               }`}
             >
               <span className="font-medium">Steg {n}.</span>{" "}
-              {n === 1 ? "Inställningar" : n === 2 ? "Spelare" : "Banor"}
+              {n === 1 ? "Inställningar" : n === 2 ? "Lag" : "Banor"}
             </div>
           ))}
         </div>
@@ -179,7 +208,7 @@ export function NewTournamentWizard({
         </div>
       )}
 
-      <main className="p-8 max-w-3xl">
+      <main className="p-8 max-w-4xl">
         {step === 1 && (
           <div className="space-y-6">
             <div>
@@ -206,33 +235,12 @@ export function NewTournamentWizard({
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium block mb-2">
-                Lottningsmetod
-              </label>
-              <div className="flex gap-2">
-                {(["seeded", "random"] as GroupFormation[]).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFormation(f)}
-                    className={`px-4 py-2 rounded-md border text-sm ${
-                      formation === f
-                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
-                        : "border-zinc-300 dark:border-zinc-700"
-                    }`}
-                  >
-                    {f === "seeded" ? "Seedad (efter nivå)" : "Slumpad"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
               <label className="text-sm font-medium block mb-1">
                 Antal grupper: {numGroups}
               </label>
               <input
                 type="range"
-                min={2}
+                min={1}
                 max={8}
                 value={numGroups}
                 onChange={(e) => setNumGroups(parseInt(e.target.value, 10))}
@@ -241,8 +249,11 @@ export function NewTournamentWizard({
             </div>
             <div>
               <label className="text-sm font-medium block mb-1">
-                Game per match
+                Game per match (mål)
               </label>
+              <p className="text-xs text-zinc-500 mb-2">
+                Första laget som når detta antal game vinner matchen.
+              </p>
               <input
                 type="number"
                 min={1}
@@ -270,49 +281,76 @@ export function NewTournamentWizard({
 
         {step === 2 && (
           <div className="space-y-4">
-            <input
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
-              placeholder="Sök spelare..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <div className="flex justify-between text-sm">
-              <span>
-                Valda: <strong>{selCount}</strong>
-                {selCount > 0 && !evenCount && (
-                  <span className="ml-2 text-amber-600">
-                    (måste vara jämnt antal)
-                  </span>
-                )}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-zinc-500">
+                Bygg lag manuellt — varje lag består av två spelare.
+              </p>
+              <span className="text-sm text-zinc-500">
+                {assignedSet.size} av {players.length} spelare tilldelade
               </span>
-              <span className="text-zinc-500">Min: {minPlayers}</span>
             </div>
-            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800 max-h-96 overflow-y-auto">
-              {filteredPlayers.length === 0 && (
-                <div className="px-4 py-6 text-center text-zinc-500 text-sm">
-                  Inga spelare matchar.
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-medium mb-2">
+                  Otilldelade spelare ({unassignedPlayers.length})
+                </h3>
+                <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 max-h-96 overflow-y-auto">
+                  {unassignedPlayers.length === 0 && (
+                    <div className="px-4 py-6 text-center text-zinc-500 text-sm">
+                      Alla spelare är tilldelade.
+                    </div>
+                  )}
+                  {unassignedPlayers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 last:border-b-0"
+                    >
+                      <span className="flex-1 text-sm font-medium">{p.name}</span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs">
+                        Nivå {p.level.toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {filteredPlayers.map((p) => {
-                const checked = selectedPlayers.has(p.id);
-                return (
-                  <label
-                    key={p.id}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium">
+                    Lag ({completeTeams.length} av {teamSlots.length} kompletta)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={addTeam}
+                    className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium"
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => togglePlayer(p.id)}
+                    + Lägg till lag
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {teamSlots.map((slot, idx) => (
+                    <TeamSlotRow
+                      key={idx}
+                      idx={idx}
+                      slot={slot}
+                      players={players}
+                      playerMap={playerMap}
+                      assignedSet={assignedSet}
+                      onChange={(s, v) => setSlot(idx, s, v)}
+                      onRemove={() => removeTeam(idx)}
                     />
-                    <span className="flex-1 text-sm font-medium">{p.name}</span>
-                    <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-xs">
-                      Nivå {p.level.toFixed(1)}
-                    </span>
-                  </label>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {teamSlots.length < numGroups && (
+              <div className="text-sm text-amber-600">
+                Du behöver minst {numGroups} lag för {numGroups} grupper.
+              </div>
+            )}
+
             <div className="flex justify-between pt-4">
               <button
                 onClick={() => setStep(1)}
@@ -378,5 +416,90 @@ export function NewTournamentWizard({
         )}
       </main>
     </div>
+  );
+}
+
+function TeamSlotRow({
+  idx,
+  slot,
+  players,
+  playerMap,
+  assignedSet,
+  onChange,
+  onRemove,
+}: {
+  idx: number;
+  slot: TeamSlot;
+  players: Player[];
+  playerMap: Map<string, Player>;
+  assignedSet: Set<string>;
+  onChange: (slot: "p1" | "p2", value: string) => void;
+  onRemove: () => void;
+}) {
+  function optionsFor(currentValue: string | null, otherValue: string | null) {
+    return players.filter(
+      (p) =>
+        p.id === currentValue ||
+        (!assignedSet.has(p.id) && p.id !== otherValue)
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-zinc-500">Lag {idx + 1}</span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-xs text-zinc-400 hover:text-red-500"
+        >
+          Ta bort
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <PlayerSelect
+          value={slot.p1}
+          options={optionsFor(slot.p1, slot.p2)}
+          playerMap={playerMap}
+          onChange={(v) => onChange("p1", v)}
+        />
+        <PlayerSelect
+          value={slot.p2}
+          options={optionsFor(slot.p2, slot.p1)}
+          playerMap={playerMap}
+          onChange={(v) => onChange("p2", v)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PlayerSelect({
+  value,
+  options,
+  playerMap,
+  onChange,
+}: {
+  value: string | null;
+  options: Player[];
+  playerMap: Map<string, Player>;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full px-2 py-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-sm"
+    >
+      <option value="">Välj spelare…</option>
+      {value && !options.some((o) => o.id === value) && (
+        <option value={value}>{playerMap.get(value)?.name ?? "?"}</option>
+      )}
+      {options.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+    </select>
   );
 }

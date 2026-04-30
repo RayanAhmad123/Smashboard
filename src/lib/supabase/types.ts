@@ -59,6 +59,13 @@ export type TournamentTeam = {
 
 export type MatchStatus = "scheduled" | "in_progress" | "completed";
 
+export type MatchStage =
+  | "group"
+  | "quarter_final"
+  | "semi_final"
+  | "bronze"
+  | "final";
+
 export type TournamentMatch = {
   id: string;
   tournament_id: string;
@@ -70,6 +77,7 @@ export type TournamentMatch = {
   score_team1: number | null;
   score_team2: number | null;
   status: MatchStatus;
+  stage: MatchStage;
   created_at: string;
 };
 

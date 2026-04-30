@@ -193,7 +193,7 @@ export function DisplayView({
 
   if (!data || !computed) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-zinc-50 text-zinc-900 flex items-center justify-center">
         <div className="flex items-center gap-4">
           <span
             className="inline-block w-3 h-3 rounded-full animate-pulse"
@@ -217,12 +217,12 @@ export function DisplayView({
 
   return (
     <div
-      className="h-screen w-screen bg-black text-white overflow-hidden flex flex-col"
+      className="h-screen w-screen bg-zinc-50 text-zinc-900 overflow-hidden flex flex-col"
       style={
         {
           "--accent": accent,
           backgroundImage:
-            "radial-gradient(ellipse 80% 60% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%)",
+            "radial-gradient(ellipse 80% 60% at 50% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)",
         } as React.CSSProperties
       }
     >
@@ -284,7 +284,7 @@ function Header({
   progress: number;
 }) {
   return (
-    <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-white/10">
+    <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-zinc-200">
       <div className="flex items-center gap-3 min-w-0">
         {tenant.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -307,19 +307,19 @@ function Header({
         )}
         <div className="min-w-0">
           <div
-            className="font-black tracking-tight leading-none truncate"
+            className="font-black tracking-tight leading-none truncate text-zinc-900"
             style={{ fontSize: "clamp(1.2rem, 2.2vw, 2.5rem)" }}
           >
             {tournament.name}
           </div>
           <div
-            className="text-zinc-400 mt-0.5 flex items-center gap-1.5 truncate"
+            className="text-zinc-500 mt-0.5 flex items-center gap-1.5 truncate"
             style={{ fontSize: "clamp(0.7rem, 0.9vw, 1rem)" }}
           >
             <span>{tenant.name}</span>
-            <span className="text-zinc-600">·</span>
+            <span className="text-zinc-300">·</span>
             <span>{FORMAT_LABEL[tournament.format]}</span>
-            <span className="text-zinc-600">·</span>
+            <span className="text-zinc-300">·</span>
             <span>Mål {tournament.games_per_match} game</span>
           </div>
         </div>
@@ -341,7 +341,7 @@ function Header({
             }}
           >
             {tournament.current_round}
-            <span className="text-zinc-600 font-bold">
+            <span className="text-zinc-300 font-bold">
               /{tournament.total_rounds || "–"}
             </span>
           </div>
@@ -353,14 +353,14 @@ function Header({
               style={{ backgroundColor: accent }}
             />
             <span
-              className="uppercase tracking-widest font-semibold text-zinc-300"
+              className="uppercase tracking-widest font-semibold text-zinc-700"
               style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
             >
               Live · {timeLabel}
             </span>
           </div>
           <div
-            className="h-1 w-[11vw] rounded-full bg-white/10 overflow-hidden"
+            className="h-1 w-[11vw] rounded-full bg-zinc-200 overflow-hidden"
             title={`${completed} av ${total} matcher klara`}
           >
             <div
@@ -465,12 +465,12 @@ function CourtCard({
 
   return (
     <div
-      className="relative rounded-3xl overflow-hidden flex flex-col bg-gradient-to-b from-zinc-900/80 to-black border"
+      className="relative rounded-3xl overflow-hidden flex flex-col bg-white border"
       style={{
-        borderColor: live ? accent : "rgba(255,255,255,0.08)",
+        borderColor: live ? accent : "rgba(0,0,0,0.08)",
         boxShadow: live
-          ? `0 0 0 1px ${accent}66, 0 8px 40px -12px ${accent}55`
-          : "0 6px 30px -16px rgba(0,0,0,0.6)",
+          ? `0 0 0 1px ${accent}88, 0 10px 30px -12px ${accent}66`
+          : "0 4px 18px -10px rgba(0,0,0,0.18)",
       }}
     >
       {/* faint court watermark */}
@@ -479,7 +479,7 @@ function CourtCard({
         src="/icons/court-topdown.svg"
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover opacity-[0.07] pointer-events-none"
+        className="absolute inset-0 w-full h-full object-cover opacity-[0.05] pointer-events-none"
       />
 
       {/* top bar */}
@@ -514,7 +514,7 @@ function CourtCard({
         </div>
         {stage && (
           <div
-            className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-300" : "text-zinc-400"}`}
+            className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
             style={{ fontSize: "clamp(0.6rem, 0.85vw, 1.05rem)" }}
           >
             {isFinal && <span className="mr-1">★</span>}
@@ -530,7 +530,7 @@ function CourtCard({
             <TeamBlock team={t1} playerMap={playerMap} align="right" />
             <div className="flex flex-col items-center justify-center">
               <div
-                className="font-black text-zinc-500 leading-none"
+                className="font-black text-zinc-300 leading-none"
                 style={{ fontSize: "clamp(0.8rem, 1.2vw, 1.5rem)" }}
               >
                 VS
@@ -565,13 +565,13 @@ function TeamBlock({
   return (
     <div className={align === "right" ? "text-right" : "text-left"}>
       <div
-        className="font-bold leading-tight truncate"
+        className="font-bold leading-tight truncate text-zinc-900"
         style={{ fontSize: "clamp(1rem, 1.8vw, 2.2rem)" }}
       >
         {shortName(p1)}
       </div>
       <div
-        className="font-bold leading-tight truncate text-zinc-200"
+        className="font-bold leading-tight truncate text-zinc-700"
         style={{ fontSize: "clamp(1rem, 1.8vw, 2.2rem)" }}
       >
         {shortName(p2)}
@@ -582,13 +582,13 @@ function TeamBlock({
 
 function DoneState() {
   return (
-    <div className="w-full flex flex-col items-center justify-center text-zinc-600 gap-1.5">
+    <div className="w-full flex flex-col items-center justify-center text-zinc-400 gap-1.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/icons/icon-trophy.svg"
         alt=""
         aria-hidden="true"
-        className="opacity-50"
+        className="opacity-80"
         style={{ width: "clamp(2rem, 4vw, 4.5rem)", height: "auto" }}
       />
       <div
@@ -614,9 +614,9 @@ function NextUp({
   const t2 = teamMap.get(match.team2_id);
   if (!t1 || !t2) return null;
   return (
-    <div className="relative border-t border-white/5 px-[1.2vw] py-[0.7vh] flex items-center gap-3 text-zinc-400">
+    <div className="relative border-t border-zinc-100 px-[1.2vw] py-[0.7vh] flex items-center gap-3 text-zinc-500">
       <span
-        className="uppercase tracking-widest font-bold text-zinc-500"
+        className="uppercase tracking-widest font-bold text-zinc-400"
         style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
       >
         Nästa
@@ -626,7 +626,7 @@ function NextUp({
         style={{ fontSize: "clamp(0.7rem, 0.9vw, 1.1rem)" }}
       >
         {shortTeamName(t1, playerMap)}{" "}
-        <span className="text-zinc-600">vs</span>{" "}
+        <span className="text-zinc-300">vs</span>{" "}
         {shortTeamName(t2, playerMap)}
       </span>
     </div>
@@ -648,11 +648,12 @@ function StandingsColumn({
 }) {
   return (
     <div
-      className="h-full rounded-2xl overflow-hidden flex flex-col border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black"
+      className="h-full rounded-2xl overflow-hidden flex flex-col border border-zinc-200 bg-white"
+      style={{ boxShadow: "0 4px 18px -10px rgba(0,0,0,0.18)" }}
     >
       <div
-        className="px-[0.8vw] py-[0.7vh] flex items-center justify-between border-b border-white/10"
-        style={{ backgroundColor: `${accent}10` }}
+        className="px-[0.8vw] py-[0.7vh] flex items-center justify-between border-b border-zinc-200"
+        style={{ backgroundColor: `${accent}15` }}
       >
         <div
           className="font-black tracking-tight uppercase"
@@ -671,7 +672,7 @@ function StandingsColumn({
           # · LAG · GD
         </div>
       </div>
-      <div className="flex-1 min-h-0 flex flex-col divide-y divide-white/5 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col divide-y divide-zinc-200 overflow-hidden">
         {groups.map((g) => {
           const groupTeams = teams.filter((t) => t.group_id === g.id);
           const groupMatches = matches.filter((m) => m.group_id === g.id);
@@ -683,12 +684,12 @@ function StandingsColumn({
               className="flex-1 min-h-0 flex flex-col overflow-hidden"
             >
               <div
-                className="px-[0.8vw] py-[0.4vh] font-bold tracking-tight text-zinc-300 flex items-center justify-between"
+                className="px-[0.8vw] py-[0.4vh] font-bold tracking-tight text-zinc-700 flex items-center justify-between bg-zinc-50"
                 style={{ fontSize: "clamp(0.75rem, 1vw, 1.15rem)" }}
               >
                 <span>{g.name}</span>
                 <span
-                  className="text-zinc-600 tabular-nums font-semibold"
+                  className="text-zinc-400 tabular-nums font-semibold"
                   style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
                 >
                   {standings.length}
@@ -700,7 +701,7 @@ function StandingsColumn({
                   return (
                     <li
                       key={s.team_id}
-                      className="flex-1 min-h-0 px-[0.8vw] flex items-center gap-2 border-t border-white/5"
+                      className="flex-1 min-h-0 px-[0.8vw] flex items-center gap-2 border-t border-zinc-100"
                       style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
                     >
                       <span
@@ -711,12 +712,12 @@ function StandingsColumn({
                                 backgroundColor: `${accent}25`,
                                 color: accent,
                               }
-                            : { color: "#71717a" }
+                            : { color: "#a1a1aa" }
                         }
                       >
                         {i + 1}
                       </span>
-                      <span className="flex-1 min-w-0 font-semibold truncate">
+                      <span className="flex-1 min-w-0 font-semibold truncate text-zinc-800">
                         {(() => {
                           const team = teamById.get(s.team_id);
                           return team
@@ -731,8 +732,8 @@ function StandingsColumn({
                             s.gd > 0
                               ? accent
                               : s.gd < 0
-                                ? "#f87171"
-                                : "#a1a1aa",
+                                ? "#dc2626"
+                                : "#71717a",
                         }}
                       >
                         {s.gd > 0 ? `+${s.gd}` : s.gd}
@@ -742,7 +743,7 @@ function StandingsColumn({
                 })}
                 {standings.length === 0 && (
                   <li
-                    className="flex-1 flex items-center justify-center text-zinc-600 px-[0.8vw]"
+                    className="flex-1 flex items-center justify-center text-zinc-400 px-[0.8vw]"
                     style={{ fontSize: "clamp(0.65rem, 0.85vw, 0.95rem)" }}
                   >
                     Inga lag
@@ -765,19 +766,19 @@ function Footer({
   tenant: Tenant;
 }) {
   return (
-    <footer className="px-[2vw] py-[0.7vh] border-t border-white/10 flex items-center justify-between">
+    <footer className="px-[2vw] py-[0.7vh] border-t border-zinc-200 flex items-center justify-between">
       <div
         className="text-zinc-500 uppercase tracking-widest font-semibold flex items-center gap-2"
         style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
       >
-        <span className="text-zinc-300">{tenant.name}</span>
-        <span className="text-zinc-700">·</span>
+        <span className="text-zinc-700">{tenant.name}</span>
+        <span className="text-zinc-300">·</span>
         <span>
           Runda {tournament.current_round} av {tournament.total_rounds || "–"}
         </span>
       </div>
       <div
-        className="text-zinc-600 uppercase tracking-widest font-semibold"
+        className="text-zinc-400 uppercase tracking-widest font-semibold"
         style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
       >
         smashboard

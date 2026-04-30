@@ -41,6 +41,17 @@ export async function getTournamentsByTenant(tenantId: string): Promise<Tourname
   return (data ?? []) as Tournament[];
 }
 
+export async function setTournamentArchived(
+  id: string,
+  archived: boolean
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournaments")
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export type CreateTournamentInput = {
   tenant_id: string;
   name: string;

@@ -38,6 +38,7 @@ export type Tournament = {
   games_per_match: number;
   current_round: number;
   total_rounds: number;
+  archived_at: string | null;
   created_at: string;
 };
 

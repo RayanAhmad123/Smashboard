@@ -1,11 +1,25 @@
-import Image from "next/image";
+import { notFound } from "next/navigation";
+import { getTenantBySlug } from "@/lib/db/tenants";
+import { TenantNav } from "./TenantNav";
 
-export default function TenantLayout({ children }: { children: React.ReactNode }) {
+export default async function TenantLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ tenant: string }>;
+}) {
+  const { tenant: slug } = await params;
+  const tenant = await getTenantBySlug(slug);
+  if (!tenant) notFound();
   return (
     <>
-      <header className="px-6 py-3 border-b border-zinc-800 bg-black">
-        <Image src="/icons/logo.svg" alt="Smashboard" width={160} height={48} priority />
-      </header>
+      <TenantNav
+        slug={tenant.slug}
+        name={tenant.name}
+        primaryColor={tenant.primary_color}
+        logoUrl={tenant.logo_url}
+      />
       {children}
     </>
   );

@@ -27,13 +27,12 @@ export function stageLabel(
 export type TeamStanding = {
   team_id: string;
   teamName: string;
-  played: number;
+  mp: number;
   wins: number;
-  draws: number;
   losses: number;
-  gamesWon: number;
-  gamesLost: number;
-  diff: number;
+  gf: number;
+  ga: number;
+  gd: number;
   points: number;
 };
 
@@ -56,13 +55,12 @@ export function computeStandings(
     map.set(t.id, {
       team_id: t.id,
       teamName: teamName(t, players),
-      played: 0,
+      mp: 0,
       wins: 0,
-      draws: 0,
       losses: 0,
-      gamesWon: 0,
-      gamesLost: 0,
-      diff: 0,
+      gf: 0,
+      ga: 0,
+      gd: 0,
       points: 0,
     });
   }
@@ -72,12 +70,12 @@ export function computeStandings(
     const t1 = map.get(m.team1_id);
     const t2 = map.get(m.team2_id);
     if (!t1 || !t2) continue;
-    t1.played++;
-    t2.played++;
-    t1.gamesWon += m.score_team1;
-    t1.gamesLost += m.score_team2;
-    t2.gamesWon += m.score_team2;
-    t2.gamesLost += m.score_team1;
+    t1.mp++;
+    t2.mp++;
+    t1.gf += m.score_team1;
+    t1.ga += m.score_team2;
+    t2.gf += m.score_team2;
+    t2.ga += m.score_team1;
     if (m.score_team1 > m.score_team2) {
       t1.wins++;
       t1.points += 3;
@@ -86,17 +84,12 @@ export function computeStandings(
       t2.wins++;
       t2.points += 3;
       t1.losses++;
-    } else {
-      t1.draws++;
-      t2.draws++;
-      t1.points += 1;
-      t2.points += 1;
     }
   }
   for (const s of map.values()) {
-    s.diff = s.gamesWon - s.gamesLost;
+    s.gd = s.gf - s.ga;
   }
   return [...map.values()].sort(
-    (a, b) => b.points - a.points || b.diff - a.diff || b.gamesWon - a.gamesWon
+    (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf
   );
 }

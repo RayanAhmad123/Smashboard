@@ -256,28 +256,30 @@ function HostInner({
                   <table className="w-full text-xs">
                     <thead className="text-zinc-500">
                       <tr>
+                        <th className="px-2 py-2 w-8">#</th>
                         <th className="text-left px-3 py-2 font-medium">Lag</th>
-                        <th className="px-2 py-2">S</th>
-                        <th className="px-2 py-2">V</th>
-                        <th className="px-2 py-2">O</th>
-                        <th className="px-2 py-2">F</th>
-                        <th className="px-2 py-2">Game +/-</th>
-                        <th className="px-2 py-2">P</th>
+                        <th className="px-2 py-2">MP</th>
+                        <th className="px-2 py-2">W</th>
+                        <th className="px-2 py-2">L</th>
+                        <th className="px-2 py-2">GD</th>
+                        <th className="px-2 py-2">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {standings.map((s) => (
+                      {standings.map((s, i) => (
                         <tr
                           key={s.team_id}
                           className="border-t border-zinc-100 dark:border-zinc-800"
                         >
+                          <td className="px-2 py-2 text-center text-zinc-500">
+                            {i + 1}
+                          </td>
                           <td className="px-3 py-2">{s.teamName}</td>
-                          <td className="px-2 py-2 text-center">{s.played}</td>
+                          <td className="px-2 py-2 text-center">{s.mp}</td>
                           <td className="px-2 py-2 text-center">{s.wins}</td>
-                          <td className="px-2 py-2 text-center">{s.draws}</td>
                           <td className="px-2 py-2 text-center">{s.losses}</td>
                           <td className="px-2 py-2 text-center">
-                            {s.gamesWon}-{s.gamesLost}
+                            {s.gd > 0 ? `+${s.gd}` : s.gd}
                           </td>
                           <td className="px-2 py-2 text-center font-semibold">
                             {s.points}

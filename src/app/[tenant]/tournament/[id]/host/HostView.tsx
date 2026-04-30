@@ -235,7 +235,10 @@ function HostInner({
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-4">Tabeller</h2>
+          <h2 className="text-lg font-semibold mb-4 flex items-center">
+            <img src="/icons/icon-standings.svg" alt="" width={28} height={28} className="inline mr-2" />
+            Tabeller
+          </h2>
           <div className="space-y-6">
             {groups.map((g) => {
               const groupTeams = teams.filter((t) => t.group_id === g.id);

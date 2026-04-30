@@ -171,13 +171,19 @@ export function DisplayView({
           return (
             <div
               key={court.id}
-              className="rounded-2xl border p-[2vw] flex flex-col justify-between"
+              className="rounded-2xl border p-[2vw] flex flex-col justify-between relative overflow-hidden"
               style={{
                 borderColor: accent,
                 minHeight: "30vh",
               }}
             >
-              <div className="flex justify-between items-baseline">
+              <img
+                src="/icons/court-topdown.svg"
+                alt=""
+                aria-hidden="true"
+                className="w-full opacity-20 absolute inset-0 object-cover pointer-events-none"
+              />
+              <div className="relative flex justify-between items-baseline">
                 <div
                   className="font-bold"
                   style={{
@@ -197,7 +203,7 @@ export function DisplayView({
                 )}
               </div>
               {m && t1 && t2 ? (
-                <div className="flex flex-col gap-[1vw] mt-[1vw]">
+                <div className="relative flex flex-col gap-[1vw] mt-[1vw]">
                   <div
                     className="font-semibold"
                     style={{ fontSize: "clamp(1.25rem, 2.4vw, 2.75rem)" }}
@@ -219,7 +225,7 @@ export function DisplayView({
                 </div>
               ) : (
                 <div
-                  className="text-zinc-700"
+                  className="relative text-zinc-700"
                   style={{ fontSize: "clamp(2rem, 5vw, 6rem)" }}
                 >
                   Klar

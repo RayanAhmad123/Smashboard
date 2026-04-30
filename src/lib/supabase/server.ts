@@ -1,4 +1,10 @@
-// Supabase server client — used in Server Components, Route Handlers, and
-// Server Actions. Reads cookies for auth context; the service-role variant
-// will live alongside this for admin-only operations.
-export const supabaseServer = null;
+import { createClient } from "@supabase/supabase-js";
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export function getSupabaseServer() {
+  return createClient(url, anonKey, {
+    auth: { persistSession: false },
+  });
+}

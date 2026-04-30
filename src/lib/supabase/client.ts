@@ -1,3 +1,10 @@
-// Supabase browser client — used by client components for realtime subscriptions
-// (TV display) and authenticated reads. Will be initialized with the public anon key.
-export const supabaseClient = null;
+"use client";
+
+import { createClient } from "@supabase/supabase-js";
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabaseClient = createClient(url, anonKey, {
+  auth: { persistSession: false },
+});

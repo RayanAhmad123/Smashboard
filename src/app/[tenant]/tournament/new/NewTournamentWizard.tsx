@@ -40,7 +40,7 @@ export function NewTournamentWizard({
   const [name, setName] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("gruppspel");
   const [numGroups, setNumGroups] = useState(2);
-  const [gamesPerMatch, setGamesPerMatch] = useState(24);
+  const [gamesPerMatch, setGamesPerMatch] = useState(5);
 
   // Step 2 — manual team builder
   const [teamSlots, setTeamSlots] = useState<TeamSlot[]>([

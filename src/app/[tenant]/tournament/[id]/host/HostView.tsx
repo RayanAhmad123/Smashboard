@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabaseClient } from "@/lib/supabase/client";
 import type {
@@ -218,7 +218,7 @@ function HostInner({
               }
               return (
                 <MatchCard
-                  key={c.id}
+                  key={m.id}
                   match={m}
                   team1={teamMap.get(m.team1_id)!}
                   team2={teamMap.get(m.team2_id)!}
@@ -325,6 +325,8 @@ function MatchCard({
     match.score_team2 != null ? String(match.score_team2) : ""
   );
   const [validationErr, setValidationErr] = useState<string | null>(null);
+  const s1Ref = useRef<HTMLInputElement>(null);
+  const s2Ref = useRef<HTMLInputElement>(null);
 
   const a = parseInt(s1, 10);
   const b = parseInt(s2, 10);
@@ -352,28 +354,40 @@ function MatchCard({
         </div>
         <div className="flex items-center gap-2">
           <input
+            ref={s1Ref}
             type="number"
             inputMode="numeric"
             min={0}
             max={gamesPerMatch}
             value={s1}
             onChange={(e) => {
-              setS1(e.target.value);
+              const next = e.target.value;
+              setS1(next);
               setValidationErr(null);
+              if (next.length > 0 && s2 === "") {
+                s2Ref.current?.focus();
+                s2Ref.current?.select();
+              }
             }}
             className="w-14 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-transparent text-center"
             disabled={busy}
           />
           <span className="text-zinc-400">–</span>
           <input
+            ref={s2Ref}
             type="number"
             inputMode="numeric"
             min={0}
             max={gamesPerMatch}
             value={s2}
             onChange={(e) => {
-              setS2(e.target.value);
+              const next = e.target.value;
+              setS2(next);
               setValidationErr(null);
+              if (next.length > 0 && s1 === "") {
+                s1Ref.current?.focus();
+                s1Ref.current?.select();
+              }
             }}
             className="w-14 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-transparent text-center"
             disabled={busy}

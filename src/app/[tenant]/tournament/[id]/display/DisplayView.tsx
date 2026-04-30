@@ -479,7 +479,7 @@ function CourtCard({
         src="/icons/court-topdown.svg"
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover opacity-[0.05] pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain object-center opacity-[0.07] pointer-events-none"
       />
 
       {/* top bar */}

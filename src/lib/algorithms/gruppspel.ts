@@ -97,7 +97,7 @@ export function generateGroups(
   return grouped.map((teamsInGroup, idx) => ({
     group: {
       name: `Grupp ${String.fromCharCode(65 + idx)}`,
-      display_order: idx,
+      sort_order: idx,
     },
     teams: teamsInGroup,
   }));

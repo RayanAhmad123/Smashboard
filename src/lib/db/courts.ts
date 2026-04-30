@@ -8,8 +8,7 @@ export async function getCourtsByTenant(tenantId: string): Promise<Court[]> {
     .from("courts")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("active", true)
-    .order("display_order");
+    .order("sort_order");
   if (error) throw error;
   return (data ?? []) as Court[];
 }
@@ -19,8 +18,7 @@ export async function getCourtsByTenantClient(tenantId: string): Promise<Court[]
     .from("courts")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("active", true)
-    .order("display_order");
+    .order("sort_order");
   if (error) throw error;
   return (data ?? []) as Court[];
 }

@@ -112,7 +112,7 @@ export function NewTournamentWizard({
         plan.map((g) => ({
           tournament_id: tournament.id,
           name: g.group.name,
-          display_order: g.group.display_order,
+          sort_order: g.group.sort_order,
         }))
       );
 

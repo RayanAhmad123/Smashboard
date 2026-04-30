@@ -11,8 +11,7 @@ export type Court = {
   id: string;
   tenant_id: string;
   name: string;
-  display_order: number;
-  active: boolean;
+  sort_order: number;
 };
 
 export type Player = {
@@ -46,7 +45,7 @@ export type TournamentGroup = {
   id: string;
   tournament_id: string;
   name: string;
-  display_order: number;
+  sort_order: number;
 };
 
 export type TournamentTeam = {

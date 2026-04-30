@@ -49,7 +49,7 @@ export function HostView({
           .from("tournament_groups")
           .select("*")
           .eq("tournament_id", tournamentId)
-          .order("display_order"),
+          .order("sort_order"),
         supabaseClient
           .from("tournament_teams")
           .select("*")

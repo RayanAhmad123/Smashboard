@@ -50,8 +50,7 @@ export function DisplayView({
         .from("courts")
         .select("*")
         .eq("tenant_id", tenant.id)
-        .eq("active", true)
-        .order("display_order"),
+        .order("sort_order"),
     ]);
     if (tRes.error || mRes.error || teamsRes.error || courtsRes.error) return;
     const teams = (teamsRes.data ?? []) as TournamentTeam[];

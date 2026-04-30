@@ -116,7 +116,7 @@ export async function getGroupsByTournament(
     .from("tournament_groups")
     .select("*")
     .eq("tournament_id", tournamentId)
-    .order("display_order");
+    .order("sort_order");
   if (error) throw error;
   return (data ?? []) as TournamentGroup[];
 }

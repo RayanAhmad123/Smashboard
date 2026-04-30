@@ -676,6 +676,7 @@ function StandingsColumn({
           const groupTeams = teams.filter((t) => t.group_id === g.id);
           const groupMatches = matches.filter((m) => m.group_id === g.id);
           const standings = computeStandings(groupTeams, groupMatches, playerMap);
+          const teamById = new Map(groupTeams.map((t) => [t.id, t]));
           return (
             <div
               key={g.id}
@@ -716,7 +717,12 @@ function StandingsColumn({
                         {i + 1}
                       </span>
                       <span className="flex-1 min-w-0 font-semibold truncate">
-                        {s.teamName}
+                        {(() => {
+                          const team = teamById.get(s.team_id);
+                          return team
+                            ? shortTeamName(team, playerMap)
+                            : s.teamName;
+                        })()}
                       </span>
                       <span
                         className="shrink-0 tabular-nums font-bold"

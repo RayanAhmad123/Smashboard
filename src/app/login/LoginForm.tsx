@@ -7,6 +7,7 @@ import { getSupabaseAuthBrowser } from "@/lib/supabase/auth-client";
 export function LoginForm() {
   const params = useSearchParams();
   const next = params.get("next") || "/";
+  const callbackError = params.get("error");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -17,9 +18,12 @@ export function LoginForm() {
     setError(null);
     const sb = getSupabaseAuthBrowser();
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    // shouldCreateUser:false → Supabase only sends a link to already-registered
+    // users. Unknown emails get a silent no-op (prevents email enumeration).
+    // Accounts are provisioned manually via Supabase / the super-admin console.
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: false },
     });
     if (error) {
       setError(error.message);
@@ -32,7 +36,8 @@ export function LoginForm() {
   if (status === "sent") {
     return (
       <p className="text-sm text-neutral-700">
-        Kolla din mail — vi har skickat en länk till <strong>{email}</strong>.
+        Om <strong>{email}</strong> är registrerat har vi skickat en
+        inloggningslänk.
       </p>
     );
   }
@@ -56,6 +61,14 @@ export function LoginForm() {
         {status === "sending" ? "Skickar…" : "Skicka inloggningslänk"}
       </button>
       {error && <p className="text-sm text-red-600">{error}</p>}
+      {callbackError && !error && (
+        <p className="text-sm text-red-600">
+          Inloggningen gick inte att slutföra ({callbackError}). Försök igen.
+        </p>
+      )}
+      <p className="text-xs text-neutral-500 mt-2">
+        Endast inbjudna konton kan logga in.
+      </p>
     </form>
   );
 }

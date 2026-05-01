@@ -211,9 +211,6 @@ export function DisplayView({
     );
   }
 
-  const progress = computed.total
-    ? Math.round((computed.completed / computed.total) * 100)
-    : 0;
   const timeLabel = now.toLocaleTimeString("sv-SE", {
     hour: "2-digit",
     minute: "2-digit",
@@ -237,7 +234,6 @@ export function DisplayView({
         timeLabel={timeLabel}
         completed={computed.completed}
         total={computed.total}
-        progress={progress}
       />
 
       <main className="flex-1 min-h-0 px-[1.5vw] py-[1vh] flex gap-[1vw]">
@@ -265,7 +261,13 @@ export function DisplayView({
         )}
       </main>
 
-      <Footer tournament={data.tournament} tenant={tenant} />
+      <Footer
+        tournament={data.tournament}
+        tenant={tenant}
+        timeLabel={timeLabel}
+      />
+
+      <FullscreenButton accent={accent} />
     </div>
   );
 }
@@ -277,7 +279,6 @@ function Header({
   timeLabel,
   completed,
   total,
-  progress,
 }: {
   tenant: Tenant;
   tournament: Tournament;
@@ -285,8 +286,9 @@ function Header({
   timeLabel: string;
   completed: number;
   total: number;
-  progress: number;
 }) {
+  const totalRounds = tournament.total_rounds || 0;
+  const currentRound = tournament.current_round;
   return (
     <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-zinc-200">
       <div className="flex items-center gap-3 min-w-0">
@@ -317,14 +319,26 @@ function Header({
             {tournament.name}
           </div>
           <div
-            className="text-zinc-500 mt-0.5 flex items-center gap-1.5 truncate"
+            className="mt-1 flex items-center gap-2 truncate"
             style={{ fontSize: "clamp(0.7rem, 0.9vw, 1rem)" }}
           >
-            <span>{tenant.name}</span>
-            <span className="text-zinc-300">·</span>
-            <span>{FORMAT_LABEL[tournament.format]}</span>
-            <span className="text-zinc-300">·</span>
-            <span>Mål {tournament.games_per_match} game</span>
+            <span className="font-semibold text-zinc-700">{tenant.name}</span>
+            <span
+              className="inline-block w-px bg-zinc-300"
+              style={{ height: "0.9em" }}
+              aria-hidden="true"
+            />
+            <span className="text-zinc-600">
+              {FORMAT_LABEL[tournament.format]}
+            </span>
+            <span
+              className="inline-block w-px bg-zinc-300"
+              style={{ height: "0.9em" }}
+              aria-hidden="true"
+            />
+            <span className="text-zinc-500 tabular-nums">
+              Mål {tournament.games_per_match} game
+            </span>
           </div>
         </div>
       </div>
@@ -344,13 +358,13 @@ function Header({
               color: accent,
             }}
           >
-            {tournament.current_round}
+            {currentRound}
             <span className="text-zinc-300 font-bold">
-              /{tournament.total_rounds || "–"}
+              /{totalRounds || "–"}
             </span>
           </div>
         </div>
-        <div className="hidden sm:flex flex-col items-end gap-0.5">
+        <div className="hidden sm:flex flex-col items-end gap-1">
           <div className="flex items-center gap-1.5">
             <span
               className="inline-block w-2 h-2 rounded-full animate-pulse"
@@ -363,18 +377,38 @@ function Header({
               Live · {timeLabel}
             </span>
           </div>
-          <div
-            className="h-1 w-[11vw] rounded-full bg-zinc-200 overflow-hidden"
-            title={`${completed} av ${total} matcher klara`}
-          >
+          {totalRounds > 0 && (
             <div
-              className="h-full rounded-full transition-[width] duration-700"
-              style={{ width: `${progress}%`, backgroundColor: accent }}
-            />
-          </div>
+              className="flex items-center gap-1"
+              title={`Runda ${currentRound} av ${totalRounds}`}
+            >
+              {Array.from({ length: totalRounds }).map((_, i) => {
+                const done = i < currentRound - 1;
+                const active = i === currentRound - 1;
+                return (
+                  <span
+                    key={i}
+                    className="rounded-full"
+                    style={{
+                      width: "clamp(1rem, 1.4vw, 1.8rem)",
+                      height: "clamp(0.3rem, 0.45vw, 0.55rem)",
+                      backgroundColor: done
+                        ? accent
+                        : active
+                          ? `${accent}80`
+                          : "#e4e4e7",
+                      boxShadow: active
+                        ? `0 0 0 2px ${accent}33`
+                        : undefined,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
           <div
             className="text-zinc-500 tabular-nums"
-            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
+            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem) " }}
           >
             {completed} / {total} matcher
           </div>
@@ -465,9 +499,19 @@ function CourtCard({
   const stage = match ? stageLabel(match, groupMap) : null;
   const live = match?.status === "in_progress";
   const isFinal = match?.stage === "final";
+  const idle = !match;
 
   return (
-    <div className="relative overflow-hidden flex flex-col">
+    <div
+      className={`relative overflow-hidden flex flex-col rounded-2xl transition-opacity ${idle ? "opacity-40 saturate-50" : ""}`}
+      style={
+        live
+          ? {
+              boxShadow: `inset 0 0 0 2px ${accent}, 0 0 28px -10px ${accent}`,
+            }
+          : undefined
+      }
+    >
       {/* top bar */}
       <div className="relative px-[1.2vw] pt-[1vh] pb-[0.6vh] flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -483,18 +527,23 @@ function CourtCard({
           </div>
           {live && (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold uppercase tracking-widest"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-black uppercase tracking-widest text-white"
               style={{
-                backgroundColor: `${accent}22`,
-                color: accent,
-                fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)",
+                backgroundColor: accent,
+                fontSize: "clamp(0.55rem, 0.8vw, 0.95rem)",
+                boxShadow: `0 0 0 4px ${accent}22`,
               }}
             >
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
-                style={{ backgroundColor: accent }}
-              />
+              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
               Live
+            </span>
+          )}
+          {idle && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 font-bold uppercase tracking-widest bg-zinc-200 text-zinc-500"
+              style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
+            >
+              Klar
             </span>
           )}
         </div>
@@ -540,7 +589,12 @@ function CourtCard({
 
       {/* footer with next-up */}
       {match && nextMatch && (
-        <NextUp match={nextMatch} teamMap={teamMap} playerMap={playerMap} />
+        <NextUp
+          match={nextMatch}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          accent={accent}
+        />
       )}
     </div>
   );
@@ -600,28 +654,35 @@ function NextUp({
   match,
   teamMap,
   playerMap,
+  accent,
 }: {
   match: TournamentMatch;
   teamMap: Map<string, TournamentTeam>;
   playerMap: Map<string, Player>;
+  accent: string;
 }) {
   const t1 = teamMap.get(match.team1_id);
   const t2 = teamMap.get(match.team2_id);
   if (!t1 || !t2) return null;
   return (
-    <div className="relative border-t border-zinc-100 px-[1.2vw] py-[0.7vh] flex items-center gap-3 text-zinc-500">
+    <div className="relative border-t border-zinc-200 px-[1.2vw] py-[0.8vh] flex items-center gap-2.5">
       <span
-        className="uppercase tracking-widest font-bold text-zinc-400"
-        style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-black uppercase tracking-widest shrink-0"
+        style={{
+          backgroundColor: `${accent}1a`,
+          color: accent,
+          fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)",
+        }}
       >
         Nästa
+        <span aria-hidden="true">→</span>
       </span>
       <span
-        className="truncate"
-        style={{ fontSize: "clamp(0.7rem, 0.9vw, 1.1rem)" }}
+        className="truncate font-semibold text-zinc-700"
+        style={{ fontSize: "clamp(0.8rem, 1.05vw, 1.25rem)" }}
       >
         {shortTeamName(t1, playerMap)}{" "}
-        <span className="text-zinc-300">vs</span>{" "}
+        <span className="text-zinc-400 font-normal">vs</span>{" "}
         {shortTeamName(t2, playerMap)}
       </span>
     </div>
@@ -690,17 +751,17 @@ function StandingsColumn({
                   {standings.length}
                 </span>
               </div>
-              <ul className="flex-1 min-h-0 flex flex-col">
+              <ul className="flex flex-col">
                 {standings.map((s, i) => {
                   const top = i === 0;
                   return (
                     <li
                       key={s.team_id}
-                      className="flex-1 min-h-0 px-[0.8vw] flex items-center gap-2 border-t border-zinc-100"
+                      className="px-[0.8vw] py-[0.45vh] flex items-center gap-2 border-t border-zinc-100"
                       style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
                     >
                       <span
-                        className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.7em] h-[1.7em] font-black tabular-nums"
+                        className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.6em] h-[1.6em] font-black tabular-nums"
                         style={
                           top
                             ? {
@@ -738,7 +799,7 @@ function StandingsColumn({
                 })}
                 {standings.length === 0 && (
                   <li
-                    className="flex-1 flex items-center justify-center text-zinc-400 px-[0.8vw]"
+                    className="px-[0.8vw] py-[0.6vh] flex items-center justify-center text-zinc-400"
                     style={{ fontSize: "clamp(0.65rem, 0.85vw, 0.95rem)" }}
                   >
                     Inga lag
@@ -756,14 +817,16 @@ function StandingsColumn({
 function Footer({
   tournament,
   tenant,
+  timeLabel,
 }: {
   tournament: Tournament;
   tenant: Tenant;
+  timeLabel: string;
 }) {
   return (
-    <footer className="px-[2vw] py-[0.7vh] border-t border-zinc-200 flex items-center justify-between">
+    <footer className="px-[2vw] py-[0.7vh] border-t border-zinc-200 flex items-center justify-between gap-3">
       <div
-        className="text-zinc-500 uppercase tracking-widest font-semibold flex items-center gap-2"
+        className="text-zinc-500 uppercase tracking-widest font-semibold flex items-center gap-2 min-w-0"
         style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
       >
         <span className="text-zinc-700">{tenant.name}</span>
@@ -771,6 +834,8 @@ function Footer({
         <span>
           Runda {tournament.current_round} av {tournament.total_rounds || "–"}
         </span>
+        <span className="text-zinc-300">·</span>
+        <span className="tabular-nums">Uppdaterad {timeLabel}</span>
       </div>
       <div
         className="text-zinc-400 uppercase tracking-widest font-semibold"
@@ -779,5 +844,66 @@ function Footer({
         smashboard
       </div>
     </footer>
+  );
+}
+
+function FullscreenButton({ accent }: { accent: string }) {
+  const [isFs, setIsFs] = useState<boolean>(false);
+
+  useEffect(() => {
+    const onChange = () => setIsFs(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    onChange();
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggle = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={isFs ? "Avsluta helskärm" : "Helskärm"}
+      title={isFs ? "Avsluta helskärm" : "Helskärm"}
+      className="fixed top-3 right-3 z-50 inline-flex items-center justify-center rounded-full bg-white/90 backdrop-blur shadow-md border border-zinc-200 hover:bg-white transition-colors"
+      style={{
+        width: "clamp(2rem, 2.4vw, 2.8rem)",
+        height: "clamp(2rem, 2.4vw, 2.8rem)",
+        color: accent,
+      }}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        style={{ width: "55%", height: "55%" }}
+      >
+        {isFs ? (
+          <>
+            <path d="M9 4v3a2 2 0 0 1-2 2H4" />
+            <path d="M15 4v3a2 2 0 0 0 2 2h3" />
+            <path d="M9 20v-3a2 2 0 0 0-2-2H4" />
+            <path d="M15 20v-3a2 2 0 0 1 2-2h3" />
+          </>
+        ) : (
+          <>
+            <path d="M4 9V6a2 2 0 0 1 2-2h3" />
+            <path d="M20 9V6a2 2 0 0 0-2-2h-3" />
+            <path d="M4 15v3a2 2 0 0 0 2 2h3" />
+            <path d="M20 15v3a2 2 0 0 1-2 2h-3" />
+          </>
+        )}
+      </svg>
+    </button>
   );
 }

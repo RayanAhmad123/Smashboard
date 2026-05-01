@@ -9,6 +9,7 @@ import { getSupabaseAuthServer } from "@/lib/supabase/auth-server";
 // session (which is super-admin gated).
 
 const SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
+const RESERVED_SLUGS = new Set(["www", "admin", "smashboard"]);
 
 function getServiceRoleClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,6 +17,73 @@ function getServiceRoleClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+export async function registerCustomer(input: {
+  slug: string;
+  name: string;
+  primary_color: string;
+  ownerEmail: string;
+}): Promise<{ ok: true; tenantId: string } | { ok: false; error: string }> {
+  await requireSuperAdmin();
+
+  const slug = input.slug.trim().toLowerCase();
+  const name = input.name.trim();
+  const email = input.ownerEmail.trim().toLowerCase();
+
+  if (!SLUG_RE.test(slug)) return { ok: false, error: "Subdomän måste vara 2–31 tecken (a–z, 0–9, -)" };
+  if (RESERVED_SLUGS.has(slug)) return { ok: false, error: "Reserverad subdomän" };
+  if (!name) return { ok: false, error: "Företagsnamn krävs" };
+  if (!email.includes("@")) return { ok: false, error: "Ogiltig e-post" };
+
+  const admin = getServiceRoleClient();
+
+  const { data: tenant, error: tErr } = await admin
+    .from("tenants")
+    .insert({ slug, name, primary_color: input.primary_color })
+    .select("id")
+    .single();
+  if (tErr || !tenant) return { ok: false, error: tErr?.message ?? "Kunde inte skapa anläggning" };
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "triadsolutions.se";
+  const redirectTo = `https://${slug}.${baseUrl}/auth/callback?next=${encodeURIComponent("/auth/set-password")}`;
+
+  const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(
+    email,
+    { redirectTo }
+  );
+
+  let userId = invite?.user?.id;
+
+  if (invErr || !userId) {
+    const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const u = existing?.users?.find((x) => x.email?.toLowerCase() === email);
+    if (!u) return { ok: false, error: invErr?.message ?? "Kunde inte skicka inbjudan" };
+    userId = u.id;
+    const { error: linkErr } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo },
+    });
+    if (linkErr) return { ok: false, error: linkErr.message };
+  }
+
+  const { error: linkErr } = await admin
+    .from("tenant_users")
+    .upsert({ tenant_id: tenant.id, user_id: userId, role: "owner" });
+  if (linkErr) return { ok: false, error: linkErr.message };
+
+  return { ok: true, tenantId: tenant.id };
+}
+
+export async function deleteTenant(input: {
+  tenantId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireSuperAdmin();
+  const admin = getServiceRoleClient();
+  const { error } = await admin.from("tenants").delete().eq("id", input.tenantId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 export async function provisionTenant(input: {
@@ -60,7 +128,7 @@ export async function inviteOwner(input: {
   if (tErr || !tenant) return { ok: false, error: "Anläggning hittades inte" };
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "triadsolutions.se";
-  const redirectTo = `https://${tenant.slug}.${baseUrl}/auth/callback?next=/`;
+  const redirectTo = `https://${tenant.slug}.${baseUrl}/auth/callback?next=${encodeURIComponent("/auth/set-password")}`;
 
   // inviteUserByEmail creates the user and emails a magic-link invite
   const { data: invite, error: invErr } = await admin.auth.admin.inviteUserByEmail(

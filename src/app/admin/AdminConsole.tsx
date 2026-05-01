@@ -2,142 +2,283 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { provisionTenant, inviteOwner } from "./actions";
+import { registerCustomer, inviteOwner, deleteTenant } from "./actions";
 
-type Tenant = {
+export type CustomerRow = {
   id: string;
   slug: string;
   name: string;
   primary_color: string | null;
   created_at: string;
+  owners: { email: string; confirmed: boolean }[];
+  memberCount: number;
 };
 
-export function AdminConsole({ tenants }: { tenants: Tenant[] }) {
+const APP_DOMAIN = "triadsolutions.se";
+
+export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#10b981");
+  const [color, setColor] = useState("#9fc843");
+  const [ownerEmail, setOwnerEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const [inviteFor, setInviteFor] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+  const [reinviteFor, setReinviteFor] = useState<string | null>(null);
+  const [reinviteEmail, setReinviteEmail] = useState("");
+  const [reinviteMsg, setReinviteMsg] = useState<string | null>(null);
 
-  function onCreate(e: React.FormEvent) {
+  function onRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     start(async () => {
-      const r = await provisionTenant({ slug: slug.trim().toLowerCase(), name: name.trim(), primary_color: color });
-      if (!r.ok) { setError(r.error); return; }
-      setSlug(""); setName("");
+      const r = await registerCustomer({
+        slug: slug.trim().toLowerCase(),
+        name: name.trim(),
+        primary_color: color,
+        ownerEmail: ownerEmail.trim(),
+      });
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setSuccessMsg(
+        `${name} registrerad. Inbjudan skickad till ${ownerEmail}. Kom ihåg att lägga till ${slug}.${APP_DOMAIN} i Vercel + DNS.`
+      );
+      setSlug("");
+      setName("");
+      setOwnerEmail("");
       router.refresh();
     });
   }
 
-  function onInvite(tenantId: string) {
-    setInviteMsg(null);
+  function onReinvite(tenantId: string) {
+    setReinviteMsg(null);
     start(async () => {
-      const r = await inviteOwner({ tenantId, email: inviteEmail.trim() });
-      if (!r.ok) { setInviteMsg(`Fel: ${r.error}`); return; }
-      setInviteMsg(`Inbjudan skickad till ${inviteEmail}`);
-      setInviteEmail("");
+      const r = await inviteOwner({ tenantId, email: reinviteEmail.trim() });
+      if (!r.ok) {
+        setReinviteMsg(`Fel: ${r.error}`);
+        return;
+      }
+      setReinviteMsg(`Ny inbjudan skickad till ${reinviteEmail}`);
+      setReinviteEmail("");
+      router.refresh();
+    });
+  }
+
+  function onDelete(tenantId: string, tenantName: string) {
+    if (!confirm(`Ta bort ${tenantName}? Detta raderar all data permanent.`)) return;
+    start(async () => {
+      const r = await deleteTenant({ tenantId });
+      if (!r.ok) {
+        alert(`Fel: ${r.error}`);
+        return;
+      }
+      router.refresh();
     });
   }
 
   return (
     <main className="min-h-screen bg-neutral-50 p-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <header className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold">Triad Solutions — Super Admin</h1>
+          <div>
+            <h1 className="text-2xl font-semibold">Smashboard Admin</h1>
+            <p className="text-sm text-neutral-500">
+              Triad Solutions — {customers.length}{" "}
+              {customers.length === 1 ? "kund" : "kunder"}
+            </p>
+          </div>
           <form action="/auth/signout" method="post">
-            <button className="text-sm text-neutral-600 hover:text-neutral-900">Logga ut</button>
+            <button className="text-sm text-neutral-600 hover:text-neutral-900">
+              Logga ut
+            </button>
           </form>
         </header>
 
         <section className="bg-white border border-neutral-200 rounded-2xl p-6 mb-6">
-          <h2 className="text-lg font-medium mb-4">Skapa ny anläggning</h2>
-          <form onSubmit={onCreate} className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input
-              required
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder="bonpadel (subdomain)"
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm md:col-span-1"
-            />
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Bon Padel"
-              className="border border-neutral-300 rounded-lg px-3 py-2 text-sm md:col-span-2"
-            />
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="border border-neutral-300 rounded-lg h-10 w-full md:col-span-1"
-            />
+          <h2 className="text-lg font-medium mb-1">Registrera ny kund</h2>
+          <p className="text-sm text-neutral-500 mb-4">
+            Skapar anläggning + skickar inbjudan till ägaren i ett steg.
+          </p>
+          <form onSubmit={onRegister} className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div className="md:col-span-3">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Företagsnamn
+              </label>
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Bon Padel"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Subdomän
+              </label>
+              <div className="flex items-center border border-neutral-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500">
+                <input
+                  required
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                  placeholder="bonpadel"
+                  className="flex-1 px-3 py-2 text-sm outline-none"
+                />
+                <span className="px-3 py-2 text-sm text-neutral-500 bg-neutral-50 border-l border-neutral-300">
+                  .{APP_DOMAIN}
+                </span>
+              </div>
+            </div>
+            <div className="md:col-span-1">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Färg
+              </label>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="border border-neutral-300 rounded-lg h-10 w-full"
+              />
+            </div>
+            <div className="md:col-span-6">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Ägarens e-post
+              </label>
+              <input
+                required
+                type="email"
+                value={ownerEmail}
+                onChange={(e) => setOwnerEmail(e.target.value)}
+                placeholder="agare@bonpadel.se"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
             <button
               type="submit"
               disabled={pending}
-              className="md:col-span-4 bg-neutral-900 text-white rounded-lg py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+              className="md:col-span-6 bg-neutral-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
             >
-              {pending ? "Skapar…" : "Skapa anläggning"}
+              {pending ? "Registrerar…" : "Registrera kund + skicka inbjudan"}
             </button>
-            {error && <p className="text-sm text-red-600 md:col-span-4">{error}</p>}
+            {error && <p className="text-sm text-red-600 md:col-span-6">{error}</p>}
+            {successMsg && (
+              <p className="text-sm text-emerald-700 md:col-span-6 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                {successMsg}
+              </p>
+            )}
           </form>
-          <p className="text-xs text-neutral-500 mt-3">
-            Glöm inte att lägga till {slug || "<slug>"}.triadsolutions.se i Vercel + GoDaddy
-            (CNAME → 5ab39abeadb98869.vercel-dns-017.com.).
-          </p>
         </section>
 
         <section className="bg-white border border-neutral-200 rounded-2xl p-6">
-          <h2 className="text-lg font-medium mb-4">Anläggningar</h2>
-          <ul className="divide-y divide-neutral-200">
-            {tenants.map((t) => (
-              <li key={t.id} className="py-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{t.name}</p>
-                    <p className="text-sm text-neutral-500">
-                      <a className="underline" href={`https://${t.slug}.triadsolutions.se`} target="_blank" rel="noreferrer">
-                        {t.slug}.triadsolutions.se
-                      </a>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setInviteFor(inviteFor === t.id ? null : t.id)}
-                    className="text-sm text-emerald-700 hover:underline"
-                  >
-                    {inviteFor === t.id ? "Avbryt" : "Bjud in ägare"}
-                  </button>
-                </div>
-                {inviteFor === t.id && (
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="agare@bonpadel.se"
-                      className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1"
-                    />
-                    <button
-                      onClick={() => onInvite(t.id)}
-                      disabled={pending || !inviteEmail}
-                      className="bg-neutral-900 text-white rounded-lg px-4 text-sm disabled:opacity-50"
-                    >
-                      Skicka
-                    </button>
-                  </div>
-                )}
-                {inviteFor === t.id && inviteMsg && (
-                  <p className="text-xs text-neutral-600">{inviteMsg}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <h2 className="text-lg font-medium mb-4">Kunder</h2>
+          {customers.length === 0 ? (
+            <p className="text-sm text-neutral-500">Inga kunder registrerade än.</p>
+          ) : (
+            <ul className="divide-y divide-neutral-200">
+              {customers.map((c) => {
+                const accent = c.primary_color || "#9fc843";
+                const pendingOwner = c.owners.some((o) => !o.confirmed);
+                return (
+                  <li key={c.id} className="py-4 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span
+                          className="inline-flex items-center justify-center h-10 w-10 rounded-lg font-black shrink-0"
+                          style={{ backgroundColor: `${accent}22`, color: accent }}
+                        >
+                          {c.name.charAt(0).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{c.name}</p>
+                          <a
+                            className="text-sm text-neutral-500 hover:text-neutral-900 underline"
+                            href={`https://${c.slug}.${APP_DOMAIN}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {c.slug}.{APP_DOMAIN}
+                          </a>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {c.owners.length === 0 ? (
+                              <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                Ingen ägare
+                              </span>
+                            ) : (
+                              c.owners.map((o) => (
+                                <span
+                                  key={o.email}
+                                  className={`text-xs px-2 py-0.5 rounded border ${
+                                    o.confirmed
+                                      ? "bg-neutral-50 text-neutral-700 border-neutral-200"
+                                      : "bg-amber-50 text-amber-700 border-amber-200"
+                                  }`}
+                                  title={o.confirmed ? "Aktiverad" : "Inbjuden, ej aktiverad"}
+                                >
+                                  {o.email}
+                                  {!o.confirmed && " · väntar"}
+                                </span>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-xs text-neutral-400">
+                          {new Date(c.created_at).toLocaleDateString("sv-SE")}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() =>
+                              setReinviteFor(reinviteFor === c.id ? null : c.id)
+                            }
+                            className="text-sm text-emerald-700 hover:underline"
+                          >
+                            {reinviteFor === c.id ? "Avbryt" : pendingOwner ? "Ny inbjudan" : "Bjud in fler"}
+                          </button>
+                          <button
+                            onClick={() => onDelete(c.id, c.name)}
+                            disabled={pending}
+                            className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            Ta bort
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {reinviteFor === c.id && (
+                      <div className="flex flex-col gap-2 pl-13">
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            value={reinviteEmail}
+                            onChange={(e) => setReinviteEmail(e.target.value)}
+                            placeholder="ny@email.se"
+                            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1"
+                          />
+                          <button
+                            onClick={() => onReinvite(c.id)}
+                            disabled={pending || !reinviteEmail}
+                            className="bg-neutral-900 text-white rounded-lg px-4 text-sm disabled:opacity-50"
+                          >
+                            Skicka
+                          </button>
+                        </div>
+                        {reinviteMsg && (
+                          <p className="text-xs text-neutral-600">{reinviteMsg}</p>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </div>
     </main>

@@ -1,8 +1,15 @@
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import Image from "next/image";
-import { LoginForm } from "./LoginForm";
+import { getSupabaseAuthServer } from "@/lib/supabase/auth-server";
+import { SetPasswordForm } from "./SetPasswordForm";
 
-export default function LoginPage() {
+export default async function SetPasswordPage() {
+  const sb = await getSupabaseAuthServer();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) redirect("/login");
+
   return (
     <main className="relative min-h-screen flex items-center justify-center bg-slate-950 p-6 overflow-hidden">
       <div
@@ -24,10 +31,13 @@ export default function LoginPage() {
           />
         </div>
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur p-8 shadow-2xl shadow-black/40">
-          <h1 className="text-2xl font-semibold text-white mb-6">Logga in</h1>
-          <Suspense>
-            <LoginForm />
-          </Suspense>
+          <h1 className="text-2xl font-semibold text-white mb-1">
+            Välj lösenord
+          </h1>
+          <p className="text-sm text-zinc-400 mb-6">
+            Skapa ett lösenord för <strong className="text-zinc-200">{user.email}</strong>.
+          </p>
+          <SetPasswordForm />
         </div>
       </div>
     </main>

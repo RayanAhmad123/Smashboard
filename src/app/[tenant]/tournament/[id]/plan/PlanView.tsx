@@ -283,8 +283,15 @@ export function PlanView({
         <section className="lg:col-span-2 space-y-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-4">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold text-zinc-700">
-                {showsTeams ? "Lag" : "Spelare"} ({teams.length})
+              <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2 flex-wrap">
+                <span>
+                  {showsTeams ? "Lag" : "Spelare"} ({teams.length})
+                </span>
+                {showsTeams && soloTeams.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium border border-amber-200">
+                    {soloTeams.length} letar partner
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-zinc-500 mt-0.5">
                 {showsTeams

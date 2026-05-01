@@ -3,6 +3,7 @@
 import {
   forwardRef,
   useEffect,
+  useId,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -53,6 +54,7 @@ export const PlayerCombobox = forwardRef<PlayerComboboxHandle, Props>(
     const [activeIdx, setActiveIdx] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const fieldId = useId();
 
     useImperativeHandle(
       ref,
@@ -132,7 +134,14 @@ export const PlayerCombobox = forwardRef<PlayerComboboxHandle, Props>(
         <input
           ref={inputRef}
           type="text"
+          name={`pc-${fieldId}`}
           autoComplete="off"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-form-type="other"
           disabled={disabled}
           autoFocus={autoFocus}
           value={query}

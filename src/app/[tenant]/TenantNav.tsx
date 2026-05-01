@@ -17,6 +17,10 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
   if (pathname?.includes("/tournament/") && pathname.endsWith("/display")) {
     return null;
   }
+  // Hide host nav on the customer-facing /play routes — different audience.
+  if (pathname === `/${slug}/play` || pathname?.startsWith(`/${slug}/play/`)) {
+    return null;
+  }
   const accent = primaryColor || "#10b981";
   const base = `/${slug}`;
   const items = [

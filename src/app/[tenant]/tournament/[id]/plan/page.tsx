@@ -5,6 +5,7 @@ import {
   getTeamsByTournamentServer,
 } from "@/lib/db/tournaments";
 import { getPlayersByTenant } from "@/lib/db/players";
+import { getRegistrationsByTournamentServer } from "@/lib/db/registrations";
 import { PlanView } from "./PlanView";
 
 export default async function TournamentPlanPage({
@@ -20,9 +21,10 @@ export default async function TournamentPlanPage({
   if (tournament.status !== "draft") {
     redirect(`/${tenant.slug}/tournament/${tournament.id}/host`);
   }
-  const [players, teams] = await Promise.all([
+  const [players, teams, registrations] = await Promise.all([
     getPlayersByTenant(tenant.id),
     getTeamsByTournamentServer(tournament.id),
+    getRegistrationsByTournamentServer(tournament.id),
   ]);
   return (
     <PlanView
@@ -30,6 +32,7 @@ export default async function TournamentPlanPage({
       tournament={tournament}
       initialTeams={teams}
       players={players.filter((p) => p.active)}
+      initialRegistrations={registrations}
     />
   );
 }

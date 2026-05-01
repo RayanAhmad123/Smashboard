@@ -161,20 +161,39 @@ function HostInner({
   );
   const totalMatches = matches.length;
 
-  const activeByCourt = useMemo(() => {
-    const m = new Map<string, TournamentMatch>();
-    for (const c of courts) {
-      const queued = matches
-        .filter((mm) => mm.court_id === c.id && mm.status === "scheduled")
-        .sort(
-          (a, b) =>
-            a.round_number - b.round_number ||
-            a.created_at.localeCompare(b.created_at)
-        );
-      if (queued[0]) m.set(c.id, queued[0]);
+  // The active "round" is the lowest round number that still has unfinished matches.
+  // All courts wait on this round until every match in it is completed before
+  // advancing — once they all complete, this naturally becomes the next round.
+  const currentRound = useMemo(() => {
+    let r: number | null = null;
+    for (const m of matches) {
+      if (m.status !== "completed") {
+        if (r === null || m.round_number < r) r = m.round_number;
+      }
     }
-    return m;
-  }, [courts, matches]);
+    return r;
+  }, [matches]);
+
+  const matchByCourt = useMemo(() => {
+    const map = new Map<string, TournamentMatch>();
+    if (currentRound === null) return map;
+    for (const c of courts) {
+      const found = matches.find(
+        (mm) => mm.court_id === c.id && mm.round_number === currentRound
+      );
+      if (found) map.set(c.id, found);
+    }
+    return map;
+  }, [courts, matches, currentRound]);
+
+  const roundCompleted = useMemo(() => {
+    let n = 0;
+    for (const m of matchByCourt.values()) {
+      if (m.status === "completed") n++;
+    }
+    return n;
+  }, [matchByCourt]);
+  const roundTotal = matchByCourt.size;
 
   async function saveScore(
     match: TournamentMatch,
@@ -192,19 +211,40 @@ function HostInner({
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 px-8 py-6 flex items-center justify-between gap-4">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-3 flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">{tournament.name}</h1>
-          <p className="text-sm text-zinc-500">
+          <h1 className="text-xl font-semibold leading-tight">
+            {tournament.name}
+          </h1>
+          <p className="text-xs text-zinc-500">
             {tenant.name} · Mål {tournament.games_per_match} game
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="px-3 py-1.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-            <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-1">
-              Matcher klara
+        <div className="flex items-center gap-2 shrink-0">
+          {currentRound !== null && (
+            <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
+                Runda{" "}
+                {tournament.total_rounds > 0
+                  ? `${currentRound}/${tournament.total_rounds}`
+                  : currentRound}
+              </div>
+              <div className="text-sm font-semibold tabular-nums leading-tight">
+                {roundCompleted}
+                <span className="text-zinc-400 font-normal">
+                  /{roundTotal}
+                </span>
+                <span className="text-zinc-500 font-normal text-[11px] ml-1">
+                  banor
+                </span>
+              </div>
             </div>
-            <div className="text-base font-semibold tabular-nums leading-none">
+          )}
+          <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+            <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
+              Totalt
+            </div>
+            <div className="text-sm font-semibold tabular-nums leading-tight">
               {completedCount}
               <span className="text-zinc-400 font-normal">/{totalMatches}</span>
             </div>
@@ -234,26 +274,44 @@ function HostInner({
         </div>
       </header>
 
-      <main className="p-8 grid lg:grid-cols-2 gap-8">
+      <main className="px-5 py-4 grid lg:grid-cols-2 gap-5">
         <section>
-          <h2 className="text-lg font-semibold mb-4">Aktiva matcher</h2>
-          <div className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+            Aktiva matcher
+          </h2>
+          <div
+            className={`grid gap-2 ${courts.length > 3 ? "lg:grid-cols-2" : "grid-cols-1"}`}
+          >
             {courts.length === 0 && (
               <div className="text-sm text-zinc-500">Inga banor.</div>
             )}
             {courts.map((c) => {
-              const m = activeByCourt.get(c.id);
+              const m = matchByCourt.get(c.id);
               if (!m) {
                 return (
-                  <div
+                  <CourtIdle
                     key={c.id}
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4"
-                  >
-                    <div className="flex justify-between items-center text-xs text-zinc-500">
-                      <span className="font-medium">{c.name}</span>
-                      <span>Klar – inga fler matcher</span>
-                    </div>
-                  </div>
+                    name={c.name}
+                    message={
+                      currentRound === null
+                        ? "Klar – inga fler matcher"
+                        : "Vilar denna runda"
+                    }
+                  />
+                );
+              }
+              if (m.status === "completed") {
+                return (
+                  <WaitingCard
+                    key={m.id}
+                    match={m}
+                    team1={teamMap.get(m.team1_id)!}
+                    team2={teamMap.get(m.team2_id)!}
+                    playerMap={playerMap}
+                    courtName={c.name}
+                    stage={stageLabel(m, groupMap)}
+                    badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                  />
                 );
               }
               return (
@@ -276,8 +334,8 @@ function HostInner({
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <img src="/icons/icon-standings.svg" alt="" width={28} height={28} className="inline mr-2" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2 flex items-center">
+            <img src="/icons/icon-standings.svg" alt="" width={20} height={20} className="inline mr-1.5" />
             Tabeller
           </h2>
           <div className="space-y-6">
@@ -435,24 +493,26 @@ function MatchCard({
   const team1Label = teamName(team1, playerMap);
   const team2Label = teamName(team2, playerMap);
   const inputClass =
-    "w-16 h-12 rounded-md border-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-xl font-semibold text-center tabular-nums focus:outline-none focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 disabled:opacity-50";
+    "w-12 h-9 rounded border-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-base font-semibold text-center tabular-nums focus:outline-none focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 disabled:opacity-50";
 
   return (
-    <div className="rounded-lg border bg-white dark:bg-zinc-900 p-4 border-zinc-200 dark:border-zinc-800">
-      <div className="flex justify-between items-center text-xs text-zinc-500 mb-3">
-        <span className="font-medium">{courtName}</span>
-        <div className="flex items-center gap-3">
-          <span className={`px-2 py-0.5 rounded font-medium ${badgeClass}`}>
+    <div className="rounded-lg border bg-white dark:bg-zinc-900 p-2.5 border-zinc-200 dark:border-zinc-800">
+      <div className="flex justify-between items-center text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">
+        <span className="font-semibold">{courtName}</span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`px-1.5 py-px rounded font-semibold ${badgeClass}`}
+          >
             {stage}
           </span>
-          <span>Mål {gamesPerMatch}</span>
+          <span className="text-zinc-400">Mål {gamesPerMatch}</span>
         </div>
       </div>
-      <div className="flex items-stretch gap-3">
-        <div className="flex-1 min-w-0 flex items-center justify-end text-right text-sm font-medium px-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-md">
+      <div className="flex items-stretch gap-2">
+        <div className="flex-1 min-w-0 flex items-center justify-end text-right text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded">
           <span className="truncate">{team1Label}</span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <input
             ref={s1Ref}
             type="number"
@@ -474,7 +534,7 @@ function MatchCard({
             className={inputClass}
             disabled={busy}
           />
-          <span className="text-zinc-400 text-lg">–</span>
+          <span className="text-zinc-400 text-sm">–</span>
           <input
             ref={s2Ref}
             type="number"
@@ -499,20 +559,102 @@ function MatchCard({
           <button
             onClick={submit}
             disabled={busy || !isValid}
-            className="ml-1 h-12 px-4 rounded-md text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="ml-0.5 h-9 px-3 rounded text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {busy ? "…" : "Klar"}
           </button>
         </div>
-        <div className="flex-1 min-w-0 flex items-center justify-start text-left text-sm font-medium px-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-md">
+        <div className="flex-1 min-w-0 flex items-center justify-start text-left text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded">
           <span className="truncate">{team2Label}</span>
         </div>
       </div>
       {validationMsg && (
-        <div className="mt-2 text-xs text-red-600 text-center">
+        <div className="mt-1 text-[10px] text-red-600 text-center">
           {validationMsg}
         </div>
       )}
+    </div>
+  );
+}
+
+function WaitingCard({
+  match,
+  team1,
+  team2,
+  playerMap,
+  courtName,
+  stage,
+  badgeClass,
+}: {
+  match: TournamentMatch;
+  team1: TournamentTeam;
+  team2: TournamentTeam;
+  playerMap: Map<string, Player>;
+  courtName: string;
+  stage: string;
+  badgeClass: string;
+}) {
+  const s1 = match.score_team1 ?? 0;
+  const s2 = match.score_team2 ?? 0;
+  const team1Won = s1 > s2;
+  const team2Won = s2 > s1;
+  const team1Label = teamName(team1, playerMap);
+  const team2Label = teamName(team2, playerMap);
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/40 p-2.5 opacity-70">
+      <div className="flex justify-between items-center text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">
+        <span className="font-semibold">{courtName}</span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`px-1.5 py-px rounded font-semibold ${badgeClass}`}
+          >
+            {stage}
+          </span>
+          <span className="font-semibold text-zinc-500">Klar · väntar</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 h-9">
+        <div className="flex-1 min-w-0 text-right text-sm font-medium truncate">
+          {team1Label}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 font-bold tabular-nums text-lg">
+          <span
+            className={
+              team1Won
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-zinc-400"
+            }
+          >
+            {s1}
+          </span>
+          <span className="text-zinc-400 text-sm">–</span>
+          <span
+            className={
+              team2Won
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-zinc-400"
+            }
+          >
+            {s2}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0 text-left text-sm font-medium truncate">
+          {team2Label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CourtIdle({ name, message }: { name: string; message: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-2.5 opacity-70 flex flex-col">
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold">
+        {name}
+      </div>
+      <div className="h-9 flex items-center justify-center text-xs text-zinc-400">
+        {message}
+      </div>
     </div>
   );
 }

@@ -568,16 +568,8 @@ function CourtCard({
           className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
         />
         {match && t1 && t2 ? (
-          <div className="relative w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.6vw] px-[10%]">
+          <div className="relative w-full grid grid-cols-2 items-center gap-[1vw] px-[10%]">
             <TeamBlock team={t1} playerMap={playerMap} align="right" />
-            <div className="flex flex-col items-center justify-center">
-              <div
-                className="font-black text-zinc-300 leading-none"
-                style={{ fontSize: "clamp(0.7rem, 1vw, 1.3rem)" }}
-              >
-                VS
-              </div>
-            </div>
             <TeamBlock team={t2} playerMap={playerMap} align="left" />
           </div>
         ) : (
@@ -614,14 +606,20 @@ function TeamBlock({
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div
-        className="font-bold leading-tight truncate text-zinc-900"
-        style={{ fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)" }}
+        className="font-bold leading-tight truncate text-white"
+        style={{
+          fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)",
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+        }}
       >
         {shortName(p1)}
       </div>
       <div
-        className="font-bold leading-tight truncate text-zinc-700"
-        style={{ fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)" }}
+        className="font-bold leading-tight truncate text-white"
+        style={{
+          fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)",
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+        }}
       >
         {shortName(p2)}
       </div>

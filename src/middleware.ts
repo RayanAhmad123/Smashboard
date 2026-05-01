@@ -17,16 +17,21 @@ function extractTenant(host: string | null): string | null {
   if (!host) return null;
   const hostname = host.split(":")[0].toLowerCase();
 
+  // Subdomains that are NOT tenants — they fall through to apex (landing page).
+  // `smashboard` is the public marketing host (smashboard.triadsolutions.se).
+  // `admin` is the super-admin console host. `www` is the canonical apex alias.
+  const RESERVED = new Set(["www", "admin", "smashboard"]);
+
   if (hostname.endsWith(".localhost")) {
     const sub = hostname.slice(0, -".localhost".length);
-    return sub && sub !== "www" ? sub : null;
+    return sub && !RESERVED.has(sub) ? sub : null;
   }
 
   if (hostname === APP_DOMAIN || hostname === `www.${APP_DOMAIN}`) return null;
 
   if (hostname.endsWith(`.${APP_DOMAIN}`)) {
     const sub = hostname.slice(0, -(`.${APP_DOMAIN}`.length));
-    if (!sub || sub === "www" || sub === "admin") return null;
+    if (!sub || RESERVED.has(sub)) return null;
     return sub;
   }
 

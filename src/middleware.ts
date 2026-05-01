@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-// Subdomain routing: extract tenant slug from the host header and rewrite
-// the request to /[tenant]/... so the App Router resolves it under the
-// dynamic tenant segment. The bare apex domain falls through unchanged.
+// Subdomain routing + auth session refresh + route gating.
 //
-// Examples:
-//   bonpadel.triadsolutions.se/players     → /bonpadel/players
-//   bonpadel.localhost:3000/tournament/new → /bonpadel/tournament/new
-//   triadsolutions.se/admin                → /admin (no rewrite)
+// Subdomain rewrite: bonpadel.triadsolutions.se/players → /bonpadel/players.
+// Apex (and reserved subdomains www/admin) fall through unchanged.
+//
+// Auth: refreshes the Supabase session cookie on every request, then for
+// host-area routes redirects unauthenticated users to /login on the same
+// subdomain. Public routes (TV display, customer /play, /login itself,
+// /auth/callback) are unrestricted.
 
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "triadsolutions.se";
 
@@ -15,7 +17,6 @@ function extractTenant(host: string | null): string | null {
   if (!host) return null;
   const hostname = host.split(":")[0].toLowerCase();
 
-  // localhost dev: tenant.localhost
   if (hostname.endsWith(".localhost")) {
     const sub = hostname.slice(0, -".localhost".length);
     return sub && sub !== "www" ? sub : null;
@@ -25,7 +26,6 @@ function extractTenant(host: string | null): string | null {
 
   if (hostname.endsWith(`.${APP_DOMAIN}`)) {
     const sub = hostname.slice(0, -(`.${APP_DOMAIN}`.length));
-    // Ignore reserved subdomains
     if (!sub || sub === "www" || sub === "admin") return null;
     return sub;
   }
@@ -33,17 +33,83 @@ function extractTenant(host: string | null): string | null {
   return null;
 }
 
-export function middleware(req: NextRequest) {
-  const tenant = extractTenant(req.headers.get("host"));
-  if (!tenant) return NextResponse.next();
+// Paths within a tenant subdomain that DO NOT require authentication.
+// Everything else under a tenant requires login.
+function isPublicTenantPath(pathname: string): boolean {
+  if (pathname === "/login" || pathname === "/auth/callback") return true;
+  if (pathname === "/auth/signout") return true;
+  if (pathname.startsWith("/play")) return true;
+  // /[tenant]/tournament/[id]/display is public — but in middleware we
+  // operate on the un-rewritten path (already relative to tenant root)
+  if (/^\/tournament\/[^/]+\/display\/?$/.test(pathname)) return true;
+  return false;
+}
 
-  const url = req.nextUrl.clone();
-  // Avoid double-rewriting if already prefixed
-  if (url.pathname.startsWith(`/${tenant}/`) || url.pathname === `/${tenant}`) {
-    return NextResponse.next();
+export async function middleware(req: NextRequest) {
+  const tenant = extractTenant(req.headers.get("host"));
+  const pathname = req.nextUrl.pathname;
+
+  // Build the response we'll return; @supabase/ssr writes refreshed
+  // session cookies onto it.
+  let res = NextResponse.next({ request: req });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          for (const { name, value } of cookiesToSet) {
+            req.cookies.set(name, value);
+          }
+          res = NextResponse.next({ request: req });
+          for (const { name, value, options } of cookiesToSet) {
+            res.cookies.set(name, value, options);
+          }
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Apex / reserved subdomain — only gate /admin
+  if (!tenant) {
+    if (pathname.startsWith("/admin") && !user) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    return res;
   }
-  url.pathname = `/${tenant}${url.pathname}`;
-  return NextResponse.rewrite(url);
+
+  // Tenant subdomain: gate non-public paths
+  if (!isPublicTenantPath(pathname) && !user) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // Rewrite to /[tenant]/... so App Router resolves under the dynamic segment
+  if (pathname.startsWith(`/${tenant}/`) || pathname === `/${tenant}`) {
+    return res;
+  }
+  const rewritten = req.nextUrl.clone();
+  rewritten.pathname = `/${tenant}${pathname}`;
+
+  // Need to apply the rewrite while preserving cookie writes from getUser.
+  const rewriteRes = NextResponse.rewrite(rewritten, { request: req });
+  res.cookies.getAll().forEach((c) => {
+    rewriteRes.cookies.set(c);
+  });
+  return rewriteRes;
 }
 
 export const config = {

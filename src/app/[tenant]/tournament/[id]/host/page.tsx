@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getTenantBySlug } from "@/lib/db/tenants";
 import { getTournamentById } from "@/lib/db/tournaments";
+import { requireTenantAccess } from "@/lib/auth/require";
 import { HostView } from "./HostView";
 
 export default async function TournamentHostPage({
@@ -9,6 +10,7 @@ export default async function TournamentHostPage({
   params: Promise<{ tenant: string; id: string }>;
 }) {
   const { tenant: slug, id } = await params;
+  await requireTenantAccess(slug);
   const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
   const tournament = await getTournamentById(id);

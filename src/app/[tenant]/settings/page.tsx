@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/db/tenants";
 import { getCourtsByTenant } from "@/lib/db/courts";
+import { requireTenantAccess } from "@/lib/auth/require";
 import { SettingsClient } from "./SettingsClient";
 
 export default async function SettingsPage({
@@ -9,6 +10,7 @@ export default async function SettingsPage({
   params: Promise<{ tenant: string }>;
 }) {
   const { tenant: slug } = await params;
+  await requireTenantAccess(slug);
   const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
   const courts = await getCourtsByTenant(tenant.id);

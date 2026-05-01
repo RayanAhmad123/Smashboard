@@ -74,14 +74,14 @@ export function PlayersClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 px-8 py-6 flex items-center justify-between">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+      <header className="border-b border-zinc-200 px-8 py-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Spelare</h1>
           <p className="text-sm text-zinc-500">{tenant.name}</p>
         </div>
         <button
-          className="px-4 py-2 rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-medium"
+          className="px-4 py-2 rounded-md bg-zinc-900 text-white text-sm font-medium"
           onClick={() => setAdding((v) => !v)}
         >
           {adding ? "Avbryt" : "Lägg till spelare"}
@@ -89,17 +89,17 @@ export function PlayersClient({
       </header>
 
       {err && (
-        <div className="mx-8 mt-4 rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-2 text-sm text-red-700 dark:text-red-300">
+        <div className="mx-8 mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
           {err}
         </div>
       )}
 
       {adding && (
-        <div className="mx-8 mt-6 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex gap-3 items-end">
+        <div className="mx-8 mt-6 p-4 rounded-lg border border-zinc-200 bg-white flex gap-3 items-end">
           <div className="flex-1">
             <label className="text-xs text-zinc-500 block mb-1">Namn</label>
             <input
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent"
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Förnamn Efternamn"
@@ -108,7 +108,7 @@ export function PlayersClient({
           <div className="w-32">
             <label className="text-xs text-zinc-500 block mb-1">Nivå</label>
             <select
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent"
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900"
               value={level}
               onChange={(e) => setLevel(parseFloat(e.target.value))}
             >
@@ -130,9 +130,9 @@ export function PlayersClient({
       )}
 
       <main className="p-8">
-        <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-zinc-50 dark:bg-zinc-900 text-left text-zinc-500">
+            <thead className="bg-zinc-50 text-left text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Namn</th>
                 <th className="px-4 py-3 font-medium w-40">Nivå</th>
@@ -150,12 +150,12 @@ export function PlayersClient({
               {players.map((p) => (
                 <tr
                   key={p.id}
-                  className="border-t border-zinc-100 dark:border-zinc-800"
+                  className="border-t border-zinc-100"
                 >
                   <td className="px-4 py-3 font-medium">{p.name}</td>
                   <td className="px-4 py-3">
                     <select
-                      className="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 bg-transparent"
+                      className="px-2 py-1 rounded border border-zinc-300 bg-white text-zinc-900"
                       value={p.level}
                       onChange={(e) => changeLevel(p, parseFloat(e.target.value))}
                     >

@@ -52,6 +52,38 @@ export async function setTournamentArchived(
   if (error) throw error;
 }
 
+// Removes a tournament and everything it owns. Children are deleted
+// explicitly in dependency order so we don't rely on FK cascade config
+// (we know at least one related FK — courts — isn't cascade).
+export async function deleteTournament(id: string): Promise<void> {
+  const sb = supabaseClient;
+  {
+    const { error } = await sb
+      .from("tournament_matches")
+      .delete()
+      .eq("tournament_id", id);
+    if (error) throw error;
+  }
+  {
+    const { error } = await sb
+      .from("tournament_teams")
+      .delete()
+      .eq("tournament_id", id);
+    if (error) throw error;
+  }
+  {
+    const { error } = await sb
+      .from("tournament_groups")
+      .delete()
+      .eq("tournament_id", id);
+    if (error) throw error;
+  }
+  {
+    const { error } = await sb.from("tournaments").delete().eq("id", id);
+    if (error) throw error;
+  }
+}
+
 export type CreateTournamentInput = {
   tenant_id: string;
   name: string;

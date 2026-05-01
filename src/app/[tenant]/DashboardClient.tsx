@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentFormat } from "@/lib/supabase/types";
-import { setTournamentArchived } from "@/lib/db/tournaments";
+import {
+  deleteTournament,
+  setTournamentArchived,
+} from "@/lib/db/tournaments";
 
 type Tab = "active" | "draft" | "completed" | "archived";
 
@@ -78,6 +81,25 @@ export function DashboardClient({
     }
   }
 
+  async function destroy(t: Tournament) {
+    if (
+      !confirm(
+        `Ta bort "${t.name}" permanent? Alla matcher, lag och grupper raderas. Det går inte att ångra.`
+      )
+    )
+      return;
+    setBusy(t.id);
+    setErr(null);
+    try {
+      await deleteTournament(t.id);
+      setTournaments((prev) => prev.filter((x) => x.id !== t.id));
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <div className="px-6 py-6">
@@ -143,6 +165,7 @@ export function DashboardClient({
                 accent={accent}
                 busy={busy === t.id}
                 onArchive={(v) => archive(t, v)}
+                onDelete={() => destroy(t)}
               />
             ))}
           </ul>
@@ -170,12 +193,14 @@ function TournamentCard({
   accent,
   busy,
   onArchive,
+  onDelete,
 }: {
   tournament: Tournament;
   tenantSlug: string;
   accent: string;
   busy: boolean;
   onArchive: (archived: boolean) => void;
+  onDelete: () => void;
 }) {
   const archived = !!tournament.archived_at;
   const isDraft = tournament.status === "draft" && !archived;
@@ -272,6 +297,15 @@ function TournamentCard({
         >
           {busy ? "..." : archived ? "Återställ" : "Arkivera"}
         </button>
+        {archived && (
+          <button
+            onClick={onDelete}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Ta bort
+          </button>
+        )}
       </div>
     </li>
   );

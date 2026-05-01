@@ -16,6 +16,7 @@ import {
   updateDraftTeam,
   deleteDraftTeam,
 } from "@/lib/db/tournaments";
+import { PlayerCombobox } from "@/components/PlayerCombobox";
 
 const FORMAT_OPTIONS: { value: TournamentFormat; label: string }[] = [
   { value: "gruppspel", label: "Gruppspel" },
@@ -149,28 +150,6 @@ export function PlanView({
     }
   }
 
-  function pickAny(): string | null {
-    return unassignedPlayers[0]?.id ?? null;
-  }
-
-  async function quickAddTeam() {
-    const a = pickAny();
-    if (!a) {
-      setErr("Inga lediga spelare.");
-      return;
-    }
-    await addTeam(a, null);
-  }
-
-  async function quickAddSolo() {
-    const a = pickAny();
-    if (!a) {
-      setErr("Inga lediga spelare.");
-      return;
-    }
-    await addTeam(a, null);
-  }
-
   function metaDirty() {
     return (
       name.trim() !== tournament.name ||
@@ -300,42 +279,25 @@ export function PlanView({
 
         <section className="lg:col-span-2 space-y-4">
           <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <div>
-                <h2 className="text-sm font-semibold text-zinc-700">
-                  {showsTeams ? "Lag" : "Spelare"} ({teams.length})
-                </h2>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {showsTeams
-                    ? "Lägg till lag — eller en spelare som letar partner."
-                    : "Lägg till spelare. Lag bildas vid varje runda."}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {showsTeams && (
-                  <button
-                    onClick={quickAddTeam}
-                    disabled={unassignedPlayers.length < 1}
-                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-white disabled:opacity-50"
-                    style={{ backgroundColor: accent }}
-                  >
-                    + Lägg till lag
-                  </button>
-                )}
-                {!showsTeams && (
-                  <button
-                    onClick={quickAddSolo}
-                    disabled={unassignedPlayers.length < 1}
-                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-white disabled:opacity-50"
-                    style={{ backgroundColor: accent }}
-                  >
-                    + Lägg till spelare
-                  </button>
-                )}
-              </div>
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-zinc-700">
+                {showsTeams ? "Lag" : "Spelare"} ({teams.length})
+              </h2>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {showsTeams
+                  ? "Skriv namnet på en spelare för att lägga till — para ihop dem nedan."
+                  : "Skriv namnet på en spelare för att lägga till. Lag bildas vid varje runda."}
+              </p>
             </div>
 
-            <div className="space-y-2">
+            <AddPlayerRow
+              accent={accent}
+              label={showsTeams ? "Lägg till spelare" : "Lägg till spelare"}
+              options={unassignedPlayers}
+              onPick={(id) => addTeam(id, null)}
+            />
+
+            <div className="space-y-2 mt-3">
               {teams.length === 0 && (
                 <div className="text-center text-sm text-zinc-500 py-8 border border-dashed border-zinc-200 rounded-lg">
                   Inga {showsTeams ? "lag" : "spelare"} ännu.
@@ -443,21 +405,28 @@ function TeamRow({
         </button>
       </div>
       <div className={`grid ${showSecondSlot ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
-        <PlayerSelect
+        <PlayerCombobox
           value={team.player1_id}
+          selectedName={playerMap.get(team.player1_id)?.name ?? null}
           options={optionsFor(team.player1_id, team.player2_id)}
-          playerMap={playerMap}
-          onChange={onChangeP1}
-          allowEmpty={false}
+          onSelect={onChangeP1}
+          placeholder="Skriv namn…"
+          disabled={busy}
         />
         {showSecondSlot && (
-          <PlayerSelect
+          <PlayerCombobox
             value={team.player2_id}
+            selectedName={
+              team.player2_id
+                ? (playerMap.get(team.player2_id)?.name ?? null)
+                : null
+            }
             options={optionsFor(team.player2_id, team.player1_id)}
-            playerMap={playerMap}
-            onChange={onChangeP2}
-            allowEmpty
-            emptyLabel="Letar partner…"
+            onSelect={onChangeP2}
+            onClear={() => onChangeP2("")}
+            allowClear
+            placeholder="Letar partner…"
+            disabled={busy}
           />
         )}
       </div>
@@ -465,38 +434,46 @@ function TeamRow({
   );
 }
 
-function PlayerSelect({
-  value,
+function AddPlayerRow({
+  accent,
+  label,
   options,
-  playerMap,
-  onChange,
-  allowEmpty,
-  emptyLabel = "Välj spelare…",
+  onPick,
 }: {
-  value: string | null;
+  accent: string;
+  label: string;
   options: Player[];
-  playerMap: Map<string, Player>;
-  onChange: (v: string) => void;
-  allowEmpty: boolean;
-  emptyLabel?: string;
+  onPick: (id: string) => void;
 }) {
+  const [nonce, setNonce] = useState(0);
+  if (options.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-zinc-200 px-3 py-2 text-xs text-zinc-500">
+        Alla aktiva spelare är tilldelade. Lägg till fler i Spelare.
+      </div>
+    );
+  }
   return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-sm"
+    <div
+      className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+      style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
     >
-      {allowEmpty || !value ? (
-        <option value="">{emptyLabel}</option>
-      ) : null}
-      {value && !options.some((o) => o.id === value) && (
-        <option value={value}>{playerMap.get(value)?.name ?? "?"}</option>
-      )}
-      {options.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}
-        </option>
-      ))}
-    </select>
+      <span className="text-xs font-medium text-zinc-500 px-1 shrink-0">
+        + {label}
+      </span>
+      <div className="flex-1">
+        <PlayerCombobox
+          key={nonce}
+          value={null}
+          selectedName={null}
+          options={options}
+          onSelect={(id) => {
+            onPick(id);
+            setNonce((n) => n + 1);
+          }}
+          placeholder="Skriv namn…"
+        />
+      </div>
+    </div>
   );
 }

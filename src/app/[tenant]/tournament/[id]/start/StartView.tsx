@@ -22,6 +22,7 @@ import {
   generateGroupMatches,
   totalRoundsFor,
 } from "@/lib/algorithms/gruppspel";
+import { PlayerCombobox } from "@/components/PlayerCombobox";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -308,7 +309,7 @@ export function StartView({
             <div className="space-y-2">
               {soloTeams.map((t) => {
                 const p1 = playerMap.get(t.player1_id);
-                const currentPair = pairing[t.id] ?? "";
+                const currentPair = pairing[t.id] ?? null;
                 const options = availableForPairing.filter(
                   (p) =>
                     p.id === currentPair ||
@@ -323,23 +324,25 @@ export function StartView({
                       {p1?.name ?? "?"}
                     </span>
                     <span className="text-xs text-zinc-400">+</span>
-                    <select
-                      className="flex-1 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-sm"
-                      value={currentPair}
-                      onChange={(e) =>
-                        setPairing((prev) => ({
-                          ...prev,
-                          [t.id]: e.target.value || null,
-                        }))
-                      }
-                    >
-                      <option value="">Välj partner…</option>
-                      {options.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-1">
+                      <PlayerCombobox
+                        value={currentPair}
+                        selectedName={
+                          currentPair
+                            ? (playerMap.get(currentPair)?.name ?? null)
+                            : null
+                        }
+                        options={options}
+                        onSelect={(id) =>
+                          setPairing((prev) => ({ ...prev, [t.id]: id }))
+                        }
+                        onClear={() =>
+                          setPairing((prev) => ({ ...prev, [t.id]: null }))
+                        }
+                        allowClear
+                        placeholder="Skriv namn på partner…"
+                      />
+                    </div>
                     <button
                       onClick={() => dropSolo(t.id)}
                       className="text-xs text-zinc-400 hover:text-red-500 px-2"

@@ -78,13 +78,16 @@ export type GeneratedMatch = Omit<TournamentMatch, "id" | "created_at">;
 
 export function generateGroupMatches(
   teamsByGroup: Map<string, TournamentTeam[]>,
-  courts: Court[]
+  courtsByGroup: Map<string, Court[]>
 ): GeneratedMatch[] {
-  if (courts.length === 0) {
-    throw new Error("At least one court is required.");
+  const groupIds = Array.from(teamsByGroup.keys());
+  for (const gid of groupIds) {
+    const c = courtsByGroup.get(gid);
+    if (!c || c.length === 0) {
+      throw new Error(`Inga banor tilldelade till grupp ${gid}.`);
+    }
   }
 
-  const groupIds = Array.from(teamsByGroup.keys());
   const perGroup = groupIds.map((gid) => {
     const teams = teamsByGroup.get(gid)!;
     const rounds = roundRobinPairs(teams.length);
@@ -104,11 +107,13 @@ export function generateGroupMatches(
   const matches: GeneratedMatch[] = [];
 
   for (let r = 0; r < totalRounds; r++) {
-    let courtIdx = 0;
     for (let g = 0; g < perGroup.length; g++) {
+      const gid = groupIds[g];
+      const groupCourts = courtsByGroup.get(gid)!;
       const groupRound = perGroup[g][r] ?? [];
+      let courtIdx = 0;
       for (const m of groupRound) {
-        const court = courts[courtIdx % courts.length];
+        const court = groupCourts[courtIdx % groupCourts.length];
         courtIdx++;
         matches.push({
           tournament_id: m.tournament_id,

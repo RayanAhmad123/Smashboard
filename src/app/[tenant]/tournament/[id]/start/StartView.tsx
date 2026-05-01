@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
@@ -69,8 +69,37 @@ export function StartView({
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
     new Set(courts.map((c) => c.id))
   );
+  // Per-court group index (which group plays on this court). Default: round-robin
+  // across the initial numGroups so each group gets at least one court out of the
+  // box. Stays in sync as numGroups changes via the clamp effect below.
+  const [courtGroupIdx, setCourtGroupIdx] = useState<Record<string, number>>(
+    () => {
+      const m: Record<string, number> = {};
+      courts.forEach((c, i) => {
+        m[c.id] = i % 2;
+      });
+      return m;
+    }
+  );
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // When numGroups shrinks, clamp out-of-range assignments back into bounds.
+  useEffect(() => {
+    setCourtGroupIdx((prev) => {
+      let dirty = false;
+      const next: Record<string, number> = {};
+      for (const [id, g] of Object.entries(prev)) {
+        if (g >= numGroups) {
+          next[id] = g % Math.max(1, numGroups);
+          dirty = true;
+        } else {
+          next[id] = g;
+        }
+      }
+      return dirty ? next : prev;
+    });
+  }, [numGroups]);
 
   const soloTeams = teams.filter((t) => !t.player2_id);
   const allUsed = useMemo(() => {
@@ -108,11 +137,22 @@ export function StartView({
     (t) => !!t.player2_id
   ).length;
 
+  const groupCourtCounts = useMemo(() => {
+    const counts = Array<number>(numGroups).fill(0);
+    for (const id of selectedCourts) {
+      const g = courtGroupIdx[id];
+      if (g !== undefined && g < numGroups) counts[g]++;
+    }
+    return counts;
+  }, [selectedCourts, courtGroupIdx, numGroups]);
+  const allGroupsHaveCourts = groupCourtCounts.every((c) => c >= 1);
+
   const canSubmit =
     formatSupported &&
     fullTeamCount >= 2 &&
     allPaired &&
     selectedCourts.size >= 1 &&
+    allGroupsHaveCourts &&
     gamesPerMatch >= 1 &&
     numGroups >= 1 &&
     fullTeamCount >= numGroups;
@@ -124,6 +164,10 @@ export function StartView({
       else next.add(id);
       return next;
     });
+  }
+
+  function setCourtGroup(id: string, g: number) {
+    setCourtGroupIdx((prev) => ({ ...prev, [id]: g }));
   }
 
   async function dropSolo(teamId: string) {
@@ -194,9 +238,20 @@ export function StartView({
         teamsByGroup.set(groupId, updated);
       }
 
-      // 5. Generate matches.
+      // 5. Generate matches. Each group only schedules into its assigned
+      //    courts; if a group has nothing assigned (e.g. user reduced
+      //    numGroups after assigning), fall back to all selected courts so
+      //    the algorithm doesn't throw. Match by sort_order rather than
+      //    array index so we don't depend on Supabase preserving insert order.
       const chosenCourts = courts.filter((c) => selectedCourts.has(c.id));
-      const matches = generateGroupMatches(teamsByGroup, chosenCourts);
+      const courtsByGroupId = new Map<string, Court[]>();
+      for (const g of insertedGroups) {
+        const own = chosenCourts.filter(
+          (c) => courtGroupIdx[c.id] === g.sort_order
+        );
+        courtsByGroupId.set(g.id, own.length > 0 ? own : chosenCourts);
+      }
+      const matches = generateGroupMatches(teamsByGroup, courtsByGroupId);
       await insertMatches(matches);
 
       // 6. Activate tournament.
@@ -337,7 +392,19 @@ export function StartView({
         </section>
 
         <section className="rounded-xl border border-zinc-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-zinc-700 mb-2">Banor</h2>
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-semibold text-zinc-700">Banor</h2>
+            {numGroups > 1 && selectedCourts.size > 0 && (
+              <span className="text-xs text-zinc-500 tabular-nums">
+                {groupCourtCounts
+                  .map(
+                    (n, i) =>
+                      `${String.fromCharCode(65 + i)}: ${n}`
+                  )
+                  .join(" · ")}
+              </span>
+            )}
+          </div>
           {courts.length === 0 ? (
             <p className="text-sm text-zinc-500">
               Inga banor finns. Lägg till banor i inställningarna först.
@@ -346,22 +413,48 @@ export function StartView({
             <div className="divide-y divide-zinc-100">
               {courts.map((c) => {
                 const checked = selectedCourts.has(c.id);
+                const g = courtGroupIdx[c.id] ?? 0;
                 return (
-                  <label
+                  <div
                     key={c.id}
-                    className="flex items-center gap-3 py-2.5 cursor-pointer"
+                    className="flex items-center gap-3 py-2.5"
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCourt(c.id)}
-                    />
-                    <span className="flex-1 text-sm font-medium">{c.name}</span>
-                  </label>
+                    <label className="flex-1 flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCourt(c.id)}
+                      />
+                      <span className="text-sm font-medium">{c.name}</span>
+                    </label>
+                    {numGroups > 1 && (
+                      <select
+                        value={g}
+                        onChange={(e) =>
+                          setCourtGroup(c.id, parseInt(e.target.value, 10))
+                        }
+                        disabled={!checked}
+                        className="px-2 py-1 rounded-md border border-zinc-300 bg-white text-xs disabled:bg-zinc-50 disabled:text-zinc-400"
+                      >
+                        {Array.from({ length: numGroups }, (_, i) => (
+                          <option key={i} value={i}>
+                            Grupp {String.fromCharCode(65 + i)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 );
               })}
             </div>
           )}
+          {numGroups > 1 &&
+            selectedCourts.size > 0 &&
+            !allGroupsHaveCourts && (
+              <p className="text-xs text-amber-600 mt-2">
+                Varje grupp behöver minst en bana.
+              </p>
+            )}
         </section>
 
         <div className="flex justify-end pt-2">

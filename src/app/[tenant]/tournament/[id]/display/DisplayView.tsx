@@ -513,35 +513,35 @@ function CourtCard({
       }
     >
       {/* top bar */}
-      <div className="relative px-[1.2vw] pt-[1vh] pb-[0.6vh] flex items-center justify-between gap-2">
+      <div className="relative px-[1vw] pt-[0.7vh] pb-[0.4vh] flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="rounded-md px-2 py-0.5 font-black tracking-tight"
+            className="rounded px-1.5 py-0.5 font-black tracking-tight"
             style={{
               backgroundColor: `${accent}1f`,
               color: accent,
-              fontSize: "clamp(0.9rem, 1.4vw, 1.7rem)",
+              fontSize: "clamp(0.65rem, 0.95vw, 1.15rem)",
             }}
           >
             {court.name}
           </div>
           {live && (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-black uppercase tracking-widest text-white"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-black uppercase tracking-widest text-white"
               style={{
                 backgroundColor: accent,
-                fontSize: "clamp(0.55rem, 0.8vw, 0.95rem)",
-                boxShadow: `0 0 0 4px ${accent}22`,
+                fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)",
+                boxShadow: `0 0 0 3px ${accent}22`,
               }}
             >
-              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               Live
             </span>
           )}
           {idle && (
             <span
-              className="inline-flex items-center rounded-full px-2 py-0.5 font-bold uppercase tracking-widest bg-zinc-200 text-zinc-500"
-              style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 font-bold uppercase tracking-widest bg-zinc-200 text-zinc-500"
+              style={{ fontSize: "clamp(0.45rem, 0.6vw, 0.75rem)" }}
             >
               Klar
             </span>
@@ -550,7 +550,7 @@ function CourtCard({
         {stage && (
           <div
             className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
-            style={{ fontSize: "clamp(0.6rem, 0.85vw, 1.05rem)" }}
+            style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
           >
             {isFinal && <span className="mr-1">★</span>}
             {stage}
@@ -559,7 +559,7 @@ function CourtCard({
       </div>
 
       {/* matchup — court SVG sits behind only this section so it never touches header/footer text */}
-      <div className="relative flex-1 min-h-0 px-[1.2vw] pb-[0.8vh] flex items-center">
+      <div className="relative flex-1 min-h-0 px-[0.4vw] pb-[0.4vh] flex items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/icons/court-topdown.svg"
@@ -568,7 +568,7 @@ function CourtCard({
           className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
         />
         {match && t1 && t2 ? (
-          <div className="relative w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.8vw]">
+          <div className="relative w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.8vw] px-[3vw]">
             <TeamBlock team={t1} playerMap={playerMap} align="right" />
             <div className="flex flex-col items-center justify-center">
               <div
@@ -665,13 +665,13 @@ function NextUp({
   const t2 = teamMap.get(match.team2_id);
   if (!t1 || !t2) return null;
   return (
-    <div className="relative border-t border-zinc-200 px-[1.2vw] py-[0.8vh] flex items-center gap-2.5">
+    <div className="relative border-t border-zinc-200 px-[1vw] py-[0.5vh] flex items-center gap-2">
       <span
-        className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-black uppercase tracking-widest shrink-0"
+        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-black uppercase tracking-widest shrink-0"
         style={{
           backgroundColor: `${accent}1a`,
           color: accent,
-          fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)",
+          fontSize: "clamp(0.45rem, 0.6vw, 0.75rem)",
         }}
       >
         Nästa
@@ -679,7 +679,7 @@ function NextUp({
       </span>
       <span
         className="truncate font-semibold text-zinc-700"
-        style={{ fontSize: "clamp(0.8rem, 1.05vw, 1.25rem)" }}
+        style={{ fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)" }}
       >
         {shortTeamName(t1, playerMap)}{" "}
         <span className="text-zinc-400 font-normal">vs</span>{" "}

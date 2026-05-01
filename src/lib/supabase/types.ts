@@ -20,6 +20,7 @@ export type Player = {
   name: string;
   level: number;
   active: boolean;
+  phone: string | null;
   created_at: string;
 };
 
@@ -40,6 +41,8 @@ export type Tournament = {
   total_rounds: number;
   scheduled_at: string | null;
   archived_at: string | null;
+  open_registration: boolean;
+  max_teams: number | null;
   created_at: string;
 };
 
@@ -86,6 +89,23 @@ export type TournamentMatch = {
 export type TournamentTeamWithPlayers = TournamentTeam & {
   player1: Player;
   player2: Player | null;
+};
+
+export type RegistrationStatus = "approved" | "pending" | "cancelled";
+
+export type TournamentRegistration = {
+  id: string;
+  tenant_id: string;
+  tournament_id: string;
+  status: RegistrationStatus;
+  player1_name: string;
+  player1_phone: string | null;
+  player2_name: string | null;
+  player2_phone: string | null;
+  created_player1_id: string | null;
+  created_player2_id: string | null;
+  tournament_team_id: string | null;
+  created_at: string;
 };
 
 export type TournamentMatchWithTeams = TournamentMatch & {

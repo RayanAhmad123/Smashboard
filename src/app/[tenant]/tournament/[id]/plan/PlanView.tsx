@@ -9,6 +9,7 @@ import type {
   TournamentFormat,
   TournamentTeam,
   Player,
+  TournamentRegistration,
 } from "@/lib/supabase/types";
 import {
   updateDraftPlan,
@@ -16,6 +17,11 @@ import {
   updateDraftTeam,
   deleteDraftTeam,
 } from "@/lib/db/tournaments";
+import {
+  setTournamentRegistrationOpen,
+  approveRegistration,
+  cancelRegistration,
+} from "@/lib/db/registrations";
 import {
   PlayerCombobox,
   type PlayerComboboxHandle,
@@ -40,11 +46,13 @@ export function PlanView({
   tournament,
   initialTeams,
   players,
+  initialRegistrations,
 }: {
   tenant: Tenant;
   tournament: Tournament;
   initialTeams: TournamentTeam[];
   players: Player[];
+  initialRegistrations: TournamentRegistration[];
 }) {
   const router = useRouter();
   const accent = tenant.primary_color || "#10b981";
@@ -60,6 +68,15 @@ export function PlanView({
   const [teams, setTeams] = useState<TournamentTeam[]>(initialTeams);
   const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const [openReg, setOpenReg] = useState(tournament.open_registration);
+  const [maxTeamsInput, setMaxTeamsInput] = useState(
+    tournament.max_teams != null ? String(tournament.max_teams) : ""
+  );
+  const [savingReg, setSavingReg] = useState(false);
+  const [registrations, setRegistrations] =
+    useState<TournamentRegistration[]>(initialRegistrations);
+  const [busyRegId, setBusyRegId] = useState<string | null>(null);
 
   const playerMap = useMemo(() => {
     const m = new Map<string, Player>();
@@ -150,6 +167,75 @@ export function PlanView({
       setErr((e as Error).message);
     } finally {
       setBusyTeamId(null);
+    }
+  }
+
+  async function saveRegistrationSettings(
+    next: { open: boolean; maxTeams: number | null }
+  ) {
+    setErr(null);
+    setSavingReg(true);
+    try {
+      await setTournamentRegistrationOpen(
+        tournament.id,
+        next.open,
+        next.maxTeams
+      );
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSavingReg(false);
+    }
+  }
+
+  async function toggleOpenReg(open: boolean) {
+    if (open) {
+      const n = parseInt(maxTeamsInput, 10);
+      if (!Number.isFinite(n) || n <= 0) {
+        setErr("Sätt ett antal platser först.");
+        return;
+      }
+      setOpenReg(true);
+      await saveRegistrationSettings({ open: true, maxTeams: n });
+    } else {
+      setOpenReg(false);
+      await saveRegistrationSettings({ open: false, maxTeams: null });
+    }
+  }
+
+  async function commitMaxTeams() {
+    if (!openReg) return;
+    const n = parseInt(maxTeamsInput, 10);
+    if (!Number.isFinite(n) || n <= 0) return;
+    await saveRegistrationSettings({ open: true, maxTeams: n });
+  }
+
+  async function approveReg(id: string) {
+    setBusyRegId(id);
+    setErr(null);
+    try {
+      const updated = await approveRegistration(id);
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === id ? updated : r))
+      );
+      router.refresh();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusyRegId(null);
+    }
+  }
+
+  async function dismissReg(id: string) {
+    setBusyRegId(id);
+    setErr(null);
+    try {
+      await cancelRegistration(id);
+      setRegistrations((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusyRegId(null);
     }
   }
 
@@ -278,6 +364,122 @@ export function PlanView({
               Hantera spelare →
             </Link>
           </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-700">
+                Öppna anmälan
+              </h2>
+              <button
+                type="button"
+                onClick={() => toggleOpenReg(!openReg)}
+                disabled={savingReg}
+                aria-pressed={openReg}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition disabled:opacity-50 ${
+                  openReg ? "" : "bg-zinc-300"
+                }`}
+                style={openReg ? { backgroundColor: accent } : undefined}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                    openReg ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Ger spelare en länk att anmäla sig själva på{" "}
+              <span className="font-mono">/play</span>.
+            </p>
+            <div>
+              <label className="text-xs font-medium block mb-1 text-zinc-500">
+                Antal platser (lag)
+              </label>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white"
+                value={maxTeamsInput}
+                onChange={(e) => setMaxTeamsInput(e.target.value)}
+                onBlur={commitMaxTeams}
+                placeholder="t.ex. 8"
+              />
+            </div>
+            {openReg && (
+              <div className="text-xs text-zinc-500 break-all">
+                <a
+                  href={`/${tenant.slug}/play/${tournament.id}`}
+                  className="underline"
+                  style={{ color: accent }}
+                >
+                  Öppna kundvyn →
+                </a>
+              </div>
+            )}
+          </div>
+
+          {registrations.length > 0 && (
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <h2 className="text-sm font-semibold text-zinc-700 mb-3">
+                Anmälningar ({registrations.length})
+              </h2>
+              <ul className="space-y-2">
+                {registrations.map((r) => {
+                  const pending = r.status === "pending";
+                  return (
+                    <li
+                      key={r.id}
+                      className="rounded-lg border border-zinc-200 p-2.5 text-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">
+                            {r.player1_name}
+                            {r.player2_name ? ` & ${r.player2_name}` : ""}
+                          </div>
+                          <div className="text-xs text-zinc-500 truncate">
+                            {r.player1_phone || "—"}
+                            {r.player2_name
+                              ? ` · ${r.player2_phone || "—"}`
+                              : ""}
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wide shrink-0 ${
+                            pending ? "text-amber-600" : "text-emerald-600"
+                          }`}
+                        >
+                          {pending ? "Reserv" : "Med"}
+                        </span>
+                      </div>
+                      {pending && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => approveReg(r.id)}
+                            disabled={busyRegId === r.id}
+                            className="px-2.5 py-1 rounded text-xs font-semibold text-white disabled:opacity-50"
+                            style={{ backgroundColor: accent }}
+                          >
+                            Släpp in
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissReg(r.id)}
+                            disabled={busyRegId === r.id}
+                            className="px-2.5 py-1 rounded text-xs font-medium text-zinc-500 hover:text-red-500 disabled:opacity-50"
+                          >
+                            Ta bort
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </section>
 
         <section className="lg:col-span-2 space-y-4">

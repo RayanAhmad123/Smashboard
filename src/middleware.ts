@@ -45,6 +45,15 @@ function isPublicTenantPath(pathname: string): boolean {
   return false;
 }
 
+// Paths that live at the app root (not nested under /[tenant]/...) and
+// should NOT be rewritten with a tenant prefix even when on a subdomain.
+function isRootRoute(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/auth/")
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const tenant = extractTenant(req.headers.get("host"));
   const pathname = req.nextUrl.pathname;
@@ -96,6 +105,10 @@ export async function middleware(req: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
+
+  // Routes that live at the app root (login, auth callback/signout) must
+  // NOT be rewritten with a tenant prefix — they exist at /login, /auth/*.
+  if (isRootRoute(pathname)) return res;
 
   // Rewrite to /[tenant]/... so App Router resolves under the dynamic segment
   if (pathname.startsWith(`/${tenant}/`) || pathname === `/${tenant}`) {

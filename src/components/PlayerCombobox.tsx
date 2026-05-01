@@ -100,9 +100,12 @@ export const PlayerCombobox = forwardRef<PlayerComboboxHandle, Props>(
     }, [filtered, activeIdx]);
 
     function commit(p: Player) {
-      onSelect(p.id);
+      // Set query first so onSelect handlers that call clear() via the ref
+      // can win the batched update — otherwise this setQuery would overwrite
+      // their reset.
       setQuery(p.name);
       setOpen(false);
+      onSelect(p.id);
     }
 
     function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {

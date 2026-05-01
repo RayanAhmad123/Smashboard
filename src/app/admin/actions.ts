@@ -81,7 +81,50 @@ export async function deleteTenant(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireSuperAdmin();
   const admin = getServiceRoleClient();
-  const { error } = await admin.from("tenants").delete().eq("id", input.tenantId);
+  const tenantId = input.tenantId;
+
+  // Pull tournament ids first so we can wipe their per-tournament children.
+  const { data: tRows, error: tErr } = await admin
+    .from("tournaments")
+    .select("id")
+    .eq("tenant_id", tenantId);
+  if (tErr) return { ok: false, error: tErr.message };
+  const tournamentIds = (tRows ?? []).map((t) => t.id);
+
+  // Order matters because we don't rely on FK cascade:
+  //
+  // 1. tournament_registrations (FK to both tenant_id and tournament_id) —
+  //    cleared first so the tournament/tenant deletes below succeed.
+  // 2. tournament_matches / tournament_teams / tournament_groups
+  //    (FK to tournament_id) — cleared before tournaments.
+  // 3. tournaments (FK to tenant_id) — cleared before tenant.
+  // 4. courts / players / tenant_users (FK to tenant_id) — cleared before tenant.
+  // 5. tenant itself.
+  {
+    const { error } = await admin
+      .from("tournament_registrations")
+      .delete()
+      .eq("tenant_id", tenantId);
+    if (error) return { ok: false, error: error.message };
+  }
+  if (tournamentIds.length > 0) {
+    for (const tbl of [
+      "tournament_matches",
+      "tournament_teams",
+      "tournament_groups",
+    ]) {
+      const { error } = await admin
+        .from(tbl)
+        .delete()
+        .in("tournament_id", tournamentIds);
+      if (error) return { ok: false, error: error.message };
+    }
+  }
+  for (const tbl of ["tournaments", "courts", "players", "tenant_users"]) {
+    const { error } = await admin.from(tbl).delete().eq("tenant_id", tenantId);
+    if (error) return { ok: false, error: error.message };
+  }
+  const { error } = await admin.from("tenants").delete().eq("id", tenantId);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

@@ -468,14 +468,6 @@ function CourtCard({
 
   return (
     <div className="relative overflow-hidden flex flex-col">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/icons/court-topdown.svg"
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
-      />
-
       {/* top bar */}
       <div className="relative px-[1.2vw] pt-[1vh] pb-[0.6vh] flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -517,10 +509,17 @@ function CourtCard({
         )}
       </div>
 
-      {/* matchup */}
+      {/* matchup — court SVG sits behind only this section so it never touches header/footer text */}
       <div className="relative flex-1 min-h-0 px-[1.2vw] pb-[0.8vh] flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/court-topdown.svg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
+        />
         {match && t1 && t2 ? (
-          <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.8vw]">
+          <div className="relative w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[0.8vw]">
             <TeamBlock team={t1} playerMap={playerMap} align="right" />
             <div className="flex flex-col items-center justify-center">
               <div
@@ -533,7 +532,9 @@ function CourtCard({
             <TeamBlock team={t2} playerMap={playerMap} align="left" />
           </div>
         ) : (
-          <DoneState />
+          <div className="relative w-full">
+            <DoneState />
+          </div>
         )}
       </div>
 

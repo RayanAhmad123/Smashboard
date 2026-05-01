@@ -1,160 +1,197 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Player } from "@/lib/supabase/types";
 
-export function PlayerCombobox({
-  value,
-  selectedName,
-  options,
-  onSelect,
-  onClear,
-  placeholder = "Skriv namn…",
-  disabled = false,
-  autoFocus = false,
-  allowClear = false,
-  emptyHint = "Ingen matchning",
-  className = "",
-}: {
+export type PlayerComboboxHandle = {
+  focus: () => void;
+  clear: () => void;
+};
+
+type Props = {
   value: string | null;
   selectedName: string | null;
   options: Player[];
   onSelect: (id: string) => void;
   onClear?: () => void;
+  onEmptyEnter?: () => void;
   placeholder?: string;
   disabled?: boolean;
   autoFocus?: boolean;
   allowClear?: boolean;
   emptyHint?: string;
   className?: string;
-}) {
-  const [query, setQuery] = useState(selectedName ?? "");
-  const [open, setOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+};
 
-  useEffect(() => {
-    setQuery(selectedName ?? "");
-  }, [selectedName]);
+export const PlayerCombobox = forwardRef<PlayerComboboxHandle, Props>(
+  function PlayerCombobox(
+    {
+      value,
+      selectedName,
+      options,
+      onSelect,
+      onClear,
+      onEmptyEnter,
+      placeholder = "Skriv namn…",
+      disabled = false,
+      autoFocus = false,
+      allowClear = false,
+      emptyHint = "Ingen matchning",
+      className = "",
+    },
+    ref
+  ) {
+    const [query, setQuery] = useState(selectedName ?? "");
+    const [open, setOpen] = useState(false);
+    const [activeIdx, setActiveIdx] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function handle(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+    useImperativeHandle(
+      ref,
+      () => ({
+        focus: () => inputRef.current?.focus(),
+        clear: () => {
+          setQuery("");
+          setOpen(false);
+        },
+      }),
+      []
+    );
+
+    useEffect(() => {
+      setQuery(selectedName ?? "");
+    }, [selectedName]);
+
+    useEffect(() => {
+      if (!open) return;
+      function handle(e: MouseEvent) {
+        if (
+          containerRef.current &&
+          !containerRef.current.contains(e.target as Node)
+        ) {
+          setOpen(false);
+          setQuery(selectedName ?? "");
+        }
+      }
+      window.addEventListener("mousedown", handle);
+      return () => window.removeEventListener("mousedown", handle);
+    }, [open, selectedName]);
+
+    const filtered = useMemo(() => {
+      const q = query.trim().toLowerCase();
+      const matches = q
+        ? options.filter((p) => p.name.toLowerCase().includes(q))
+        : options;
+      return matches.slice(0, 8);
+    }, [query, options]);
+
+    useEffect(() => {
+      if (activeIdx >= filtered.length) setActiveIdx(0);
+    }, [filtered, activeIdx]);
+
+    function commit(p: Player) {
+      onSelect(p.id);
+      setQuery(p.name);
+      setOpen(false);
+    }
+
+    function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setOpen(true);
+        setActiveIdx((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter") {
+        if (open && filtered[activeIdx]) {
+          e.preventDefault();
+          commit(filtered[activeIdx]);
+        } else if (!query.trim() && onEmptyEnter) {
+          e.preventDefault();
+          setOpen(false);
+          onEmptyEnter();
+        }
+      } else if (e.key === "Escape") {
         setOpen(false);
         setQuery(selectedName ?? "");
+        inputRef.current?.blur();
       }
     }
-    window.addEventListener("mousedown", handle);
-    return () => window.removeEventListener("mousedown", handle);
-  }, [open, selectedName]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const matches = q
-      ? options.filter((p) => p.name.toLowerCase().includes(q))
-      : options;
-    return matches.slice(0, 8);
-  }, [query, options]);
-
-  useEffect(() => {
-    if (activeIdx >= filtered.length) setActiveIdx(0);
-  }, [filtered, activeIdx]);
-
-  function commit(p: Player) {
-    onSelect(p.id);
-    setQuery(p.name);
-    setOpen(false);
-  }
-
-  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setOpen(true);
-      setActiveIdx((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      if (open && filtered[activeIdx]) {
-        e.preventDefault();
-        commit(filtered[activeIdx]);
-      }
-    } else if (e.key === "Escape") {
-      setOpen(false);
-      setQuery(selectedName ?? "");
-      inputRef.current?.blur();
-    }
-  }
-
-  return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <input
-        ref={inputRef}
-        type="text"
-        autoComplete="off"
-        disabled={disabled}
-        autoFocus={autoFocus}
-        value={query}
-        placeholder={placeholder}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-          setActiveIdx(0);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKey}
-        className="w-full px-2 py-1.5 pr-7 rounded-md border border-zinc-300 bg-white text-sm disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-zinc-400"
-      />
-      {allowClear && value && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setQuery("");
-            setOpen(false);
-            onClear?.();
+    return (
+      <div ref={containerRef} className={`relative ${className}`}>
+        <input
+          ref={inputRef}
+          type="text"
+          autoComplete="off"
+          disabled={disabled}
+          autoFocus={autoFocus}
+          value={query}
+          placeholder={placeholder}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            setActiveIdx(0);
           }}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-zinc-700 text-base leading-none"
-          aria-label="Rensa"
-        >
-          ×
-        </button>
-      )}
-      {open && filtered.length > 0 && (
-        <ul
-          role="listbox"
-          className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-md border border-zinc-200 bg-white shadow-md"
-        >
-          {filtered.map((p, i) => (
-            <li
-              key={p.id}
-              role="option"
-              aria-selected={i === activeIdx}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commit(p);
-              }}
-              onMouseEnter={() => setActiveIdx(i)}
-              className={`px-2 py-1.5 text-sm cursor-pointer ${
-                i === activeIdx ? "bg-zinc-100" : "bg-white"
-              }`}
-            >
-              {p.name}
-            </li>
-          ))}
-        </ul>
-      )}
-      {open && query.trim() && filtered.length === 0 && (
-        <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-zinc-200 bg-white shadow-md px-2 py-1.5 text-xs text-zinc-500">
-          {emptyHint}
-        </div>
-      )}
-    </div>
-  );
-}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKey}
+          className="w-full px-2 py-1.5 pr-7 rounded-md border border-zinc-300 bg-white text-sm disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+        />
+        {allowClear && value && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setQuery("");
+              setOpen(false);
+              onClear?.();
+            }}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-zinc-700 text-base leading-none"
+            aria-label="Rensa"
+          >
+            ×
+          </button>
+        )}
+        {open && filtered.length > 0 && (
+          <ul
+            role="listbox"
+            className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-md border border-zinc-200 bg-white shadow-md"
+          >
+            {filtered.map((p, i) => (
+              <li
+                key={p.id}
+                role="option"
+                aria-selected={i === activeIdx}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  commit(p);
+                }}
+                onMouseEnter={() => setActiveIdx(i)}
+                className={`px-2 py-1.5 text-sm cursor-pointer ${
+                  i === activeIdx ? "bg-zinc-100" : "bg-white"
+                }`}
+              >
+                {p.name}
+              </li>
+            ))}
+          </ul>
+        )}
+        {open && query.trim() && filtered.length === 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-zinc-200 bg-white shadow-md px-2 py-1.5 text-xs text-zinc-500">
+            {emptyHint}
+          </div>
+        )}
+      </div>
+    );
+  }
+);

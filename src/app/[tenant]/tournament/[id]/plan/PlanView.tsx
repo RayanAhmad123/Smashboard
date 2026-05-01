@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
@@ -16,7 +16,10 @@ import {
   updateDraftTeam,
   deleteDraftTeam,
 } from "@/lib/db/tournaments";
-import { PlayerCombobox } from "@/components/PlayerCombobox";
+import {
+  PlayerCombobox,
+  type PlayerComboboxHandle,
+} from "@/components/PlayerCombobox";
 
 const FORMAT_OPTIONS: { value: TournamentFormat; label: string }[] = [
   { value: "gruppspel", label: "Gruppspel" },
@@ -292,9 +295,9 @@ export function PlanView({
 
             <AddPlayerRow
               accent={accent}
-              label={showsTeams ? "Lägg till spelare" : "Lägg till spelare"}
+              paired={showsTeams}
               options={unassignedPlayers}
-              onPick={(id) => addTeam(id, null)}
+              onAdd={(p1, p2) => addTeam(p1, p2)}
             />
 
             <div className="space-y-2 mt-3">
@@ -436,16 +439,38 @@ function TeamRow({
 
 function AddPlayerRow({
   accent,
-  label,
+  paired,
   options,
-  onPick,
+  onAdd,
 }: {
   accent: string;
-  label: string;
+  paired: boolean;
   options: Player[];
-  onPick: (id: string) => void;
+  onAdd: (p1: string, p2: string | null) => void;
 }) {
-  const [nonce, setNonce] = useState(0);
+  const [p1, setP1] = useState<string | null>(null);
+  const ref1 = useRef<PlayerComboboxHandle>(null);
+  const ref2 = useRef<PlayerComboboxHandle>(null);
+
+  const playerById = useMemo(() => {
+    const m = new Map<string, Player>();
+    for (const p of options) m.set(p.id, p);
+    return m;
+  }, [options]);
+
+  const p1Name = p1 ? (playerById.get(p1)?.name ?? null) : null;
+  const p2Options = useMemo(
+    () => (p1 ? options.filter((p) => p.id !== p1) : options),
+    [options, p1]
+  );
+
+  function reset(focusFirst = true) {
+    setP1(null);
+    ref1.current?.clear();
+    ref2.current?.clear();
+    if (focusFirst) ref1.current?.focus();
+  }
+
   if (options.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-zinc-200 px-3 py-2 text-xs text-zinc-500">
@@ -453,25 +478,70 @@ function AddPlayerRow({
       </div>
     );
   }
+
+  if (!paired) {
+    return (
+      <div
+        className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+        style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
+      >
+        <span className="text-xs font-medium text-zinc-500 px-1 shrink-0">
+          + Lägg till spelare
+        </span>
+        <div className="flex-1">
+          <PlayerCombobox
+            ref={ref1}
+            value={null}
+            selectedName={null}
+            options={options}
+            onSelect={(id) => {
+              onAdd(id, null);
+              reset();
+            }}
+            placeholder="Skriv namn…"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+      className="rounded-md border border-zinc-200 bg-zinc-50 p-2"
       style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
     >
-      <span className="text-xs font-medium text-zinc-500 px-1 shrink-0">
-        + {label}
-      </span>
-      <div className="flex-1">
+      <div className="text-xs font-medium text-zinc-500 px-1 mb-1.5">
+        + Lägg till lag
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <PlayerCombobox
-          key={nonce}
-          value={null}
-          selectedName={null}
+          ref={ref1}
+          value={p1}
+          selectedName={p1Name}
           options={options}
           onSelect={(id) => {
-            onPick(id);
-            setNonce((n) => n + 1);
+            setP1(id);
+            ref2.current?.focus();
           }}
-          placeholder="Skriv namn…"
+          placeholder="Spelare 1 — skriv namn…"
+        />
+        <PlayerCombobox
+          ref={ref2}
+          value={null}
+          selectedName={null}
+          options={p2Options}
+          disabled={!p1}
+          onSelect={(id) => {
+            if (!p1) return;
+            onAdd(p1, id);
+            reset();
+          }}
+          onEmptyEnter={() => {
+            if (!p1) return;
+            onAdd(p1, null);
+            reset();
+          }}
+          placeholder="Spelare 2 — eller Enter för letar partner…"
         />
       </div>
     </div>

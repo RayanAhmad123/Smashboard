@@ -18,6 +18,11 @@ import {
   shortName,
   shortTeamName,
 } from "@/lib/standings";
+import {
+  buildGroupIndex,
+  groupBadgeOrNull,
+  groupPaletteFor,
+} from "@/lib/group-colors";
 
 type Loaded = {
   tournament: Tournament;
@@ -163,6 +168,7 @@ export function DisplayView({
     for (const t of data.teams) teamMap.set(t.id, t);
     const groupMap = new Map<string, TournamentGroup>();
     for (const g of data.groups) groupMap.set(g.id, g);
+    const groupIndexMap = buildGroupIndex(data.groups);
 
     const byCourt = new Map<string, TournamentMatch>();
     const nextByCourt = new Map<string, TournamentMatch>();
@@ -185,6 +191,7 @@ export function DisplayView({
       playerMap,
       teamMap,
       groupMap,
+      groupIndexMap,
       byCourt,
       nextByCourt,
       completed,
@@ -244,6 +251,7 @@ export function DisplayView({
             nextByCourt={computed.nextByCourt}
             teamMap={computed.teamMap}
             groupMap={computed.groupMap}
+            groupIndexMap={computed.groupIndexMap}
             playerMap={computed.playerMap}
             accent={accent}
           />
@@ -432,6 +440,7 @@ function MatchesView({
   nextByCourt,
   teamMap,
   groupMap,
+  groupIndexMap,
   playerMap,
   accent,
 }: {
@@ -440,6 +449,7 @@ function MatchesView({
   nextByCourt: Map<string, TournamentMatch>;
   teamMap: Map<string, TournamentTeam>;
   groupMap: Map<string, TournamentGroup>;
+  groupIndexMap: Map<string, number>;
   playerMap: Map<string, Player>;
   accent: string;
 }) {
@@ -469,6 +479,7 @@ function MatchesView({
           nextMatch={nextByCourt.get(court.id) ?? null}
           teamMap={teamMap}
           groupMap={groupMap}
+          groupIndexMap={groupIndexMap}
           playerMap={playerMap}
           accent={accent}
         />
@@ -483,6 +494,7 @@ function CourtCard({
   nextMatch,
   teamMap,
   groupMap,
+  groupIndexMap,
   playerMap,
   accent,
 }: {
@@ -491,6 +503,7 @@ function CourtCard({
   nextMatch: TournamentMatch | null;
   teamMap: Map<string, TournamentTeam>;
   groupMap: Map<string, TournamentGroup>;
+  groupIndexMap: Map<string, number>;
   playerMap: Map<string, Player>;
   accent: string;
 }) {
@@ -500,6 +513,7 @@ function CourtCard({
   const live = match?.status === "in_progress";
   const isFinal = match?.stage === "final";
   const idle = !match;
+  const groupBadge = match ? groupBadgeOrNull(match, groupIndexMap) : null;
 
   return (
     <div
@@ -548,13 +562,22 @@ function CourtCard({
           )}
         </div>
         {stage && (
-          <div
-            className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
-            style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
-          >
-            {isFinal && <span className="mr-1">★</span>}
-            {stage}
-          </div>
+          groupBadge ? (
+            <div
+              className={`font-bold uppercase tracking-wider px-2 py-0.5 rounded ${groupBadge}`}
+              style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
+            >
+              {stage}
+            </div>
+          ) : (
+            <div
+              className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
+              style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
+            >
+              {isFinal && <span className="mr-1">★</span>}
+              {stage}
+            </div>
+          )
         )}
       </div>
 
@@ -727,23 +750,24 @@ function StandingsColumn({
         </div>
       </div>
       <div className="flex-1 min-h-0 flex flex-col divide-y divide-zinc-200 overflow-hidden">
-        {groups.map((g) => {
+        {groups.map((g, gi) => {
           const groupTeams = teams.filter((t) => t.group_id === g.id);
           const groupMatches = matches.filter((m) => m.group_id === g.id);
           const standings = computeStandings(groupTeams, groupMatches, playerMap);
           const teamById = new Map(groupTeams.map((t) => [t.id, t]));
+          const palette = groupPaletteFor(gi);
           return (
             <div
               key={g.id}
               className="flex-1 min-h-0 flex flex-col overflow-hidden"
             >
               <div
-                className="px-[0.8vw] py-[0.4vh] font-bold tracking-tight text-zinc-700 flex items-center justify-between bg-zinc-50"
+                className={`px-[0.8vw] py-[0.4vh] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
                 style={{ fontSize: "clamp(0.75rem, 1vw, 1.15rem)" }}
               >
                 <span>{g.name}</span>
                 <span
-                  className="text-zinc-400 tabular-nums font-semibold"
+                  className="opacity-60 tabular-nums font-semibold"
                   style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
                 >
                   {standings.length}

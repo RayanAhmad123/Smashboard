@@ -195,6 +195,24 @@ function HostInner({
   }, [matchByCourt]);
   const roundTotal = matchByCourt.size;
 
+  // Sort courts so matches in the same group sit next to each other.
+  // Knockout matches (no group_id) and idle courts go last.
+  const sortedCourts = useMemo(() => {
+    const decorated = courts.map((c, idx) => ({ court: c, idx }));
+    decorated.sort((a, b) => {
+      const ma = matchByCourt.get(a.court.id);
+      const mb = matchByCourt.get(b.court.id);
+      if (!ma && !mb) return a.idx - b.idx;
+      if (!ma) return 1;
+      if (!mb) return -1;
+      const ga = ma.group_id ? groupIndexMap.get(ma.group_id) ?? 9999 : 9999;
+      const gb = mb.group_id ? groupIndexMap.get(mb.group_id) ?? 9999 : 9999;
+      if (ga !== gb) return ga - gb;
+      return a.idx - b.idx;
+    });
+    return decorated.map((d) => d.court);
+  }, [courts, matchByCourt, groupIndexMap]);
+
   async function saveScore(
     match: TournamentMatch,
     s1: number,
@@ -274,18 +292,18 @@ function HostInner({
         </div>
       </header>
 
-      <main className="px-5 py-4 grid lg:grid-cols-2 gap-5">
+      <main className="px-5 py-4 grid lg:grid-cols-[1fr_300px] gap-5">
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2">
             Aktiva matcher
           </h2>
           <div
-            className={`grid gap-2 ${courts.length > 3 ? "lg:grid-cols-2" : "grid-cols-1"}`}
+            className={`grid gap-2 ${courts.length > 1 ? "lg:grid-cols-2" : "grid-cols-1"}`}
           >
             {courts.length === 0 && (
               <div className="text-sm text-zinc-500">Inga banor.</div>
             )}
-            {courts.map((c) => {
+            {sortedCourts.map((c) => {
               const m = matchByCourt.get(c.id);
               if (!m) {
                 return (

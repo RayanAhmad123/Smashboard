@@ -83,7 +83,11 @@ export function DisplayView({
       return;
     const teams = (teamsRes.data ?? []) as TournamentTeam[];
     const playerIds = Array.from(
-      new Set(teams.flatMap((t) => [t.player1_id, t.player2_id]))
+      new Set(
+        teams.flatMap((t) =>
+          t.player2_id ? [t.player1_id, t.player2_id] : [t.player1_id]
+        )
+      )
     );
     const playersRes = playerIds.length
       ? await supabaseClient.from("players").select("*").in("id", playerIds)
@@ -551,7 +555,7 @@ function TeamBlock({
   align: "left" | "right";
 }) {
   const p1 = playerMap.get(team.player1_id);
-  const p2 = playerMap.get(team.player2_id);
+  const p2 = team.player2_id ? playerMap.get(team.player2_id) : undefined;
   return (
     <div className={align === "right" ? "text-right" : "text-left"}>
       <div

@@ -152,6 +152,18 @@ export function DashboardClient({
   );
 }
 
+function formatScheduled(iso: string | null): string {
+  if (!iso) return "Tid ej satt";
+  const d = new Date(iso);
+  return d.toLocaleString("sv-SE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function TournamentCard({
   tournament,
   tenantSlug,
@@ -166,6 +178,7 @@ function TournamentCard({
   onArchive: (archived: boolean) => void;
 }) {
   const archived = !!tournament.archived_at;
+  const isDraft = tournament.status === "draft" && !archived;
   const created = new Date(tournament.created_at).toLocaleDateString("sv-SE");
   const progress = tournament.total_rounds
     ? Math.round(
@@ -184,44 +197,73 @@ function TournamentCard({
           <div className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1.5">
             <span>{FORMAT_LABEL[tournament.format]}</span>
             <span className="text-zinc-300">·</span>
-            <span>Mål {tournament.games_per_match}</span>
-            <span className="text-zinc-300">·</span>
-            <span>{created}</span>
+            {isDraft ? (
+              <span>{formatScheduled(tournament.scheduled_at)}</span>
+            ) : (
+              <>
+                <span>Mål {tournament.games_per_match}</span>
+                <span className="text-zinc-300">·</span>
+                <span>{created}</span>
+              </>
+            )}
           </div>
         </div>
         <StatusBadge tournament={tournament} accent={accent} />
       </div>
 
-      <div>
-        <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
-          <span>
-            Runda {tournament.current_round} / {tournament.total_rounds || "–"}
-          </span>
-          <span className="tabular-nums">{progress}%</span>
+      {!isDraft && (
+        <div>
+          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+            <span>
+              Runda {tournament.current_round} /{" "}
+              {tournament.total_rounds || "–"}
+            </span>
+            <span className="tabular-nums">{progress}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${progress}%`, backgroundColor: accent }}
+            />
+          </div>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${progress}%`, backgroundColor: accent }}
-          />
-        </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-2 mt-1 flex-wrap">
-        <Link
-          href={`/${tenantSlug}/tournament/${tournament.id}/display`}
-          target="_blank"
-          className="px-3 py-1.5 rounded-md text-xs font-semibold text-white"
-          style={{ backgroundColor: accent }}
-        >
-          TV-vy
-        </Link>
-        <Link
-          href={`/${tenantSlug}/tournament/${tournament.id}/host`}
-          className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-        >
-          Värd
-        </Link>
+        {isDraft ? (
+          <>
+            <Link
+              href={`/${tenantSlug}/tournament/${tournament.id}/plan`}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold text-white"
+              style={{ backgroundColor: accent }}
+            >
+              Planera
+            </Link>
+            <Link
+              href={`/${tenantSlug}/tournament/${tournament.id}/start`}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+            >
+              Starta →
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href={`/${tenantSlug}/tournament/${tournament.id}/display`}
+              target="_blank"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold text-white"
+              style={{ backgroundColor: accent }}
+            >
+              TV-vy
+            </Link>
+            <Link
+              href={`/${tenantSlug}/tournament/${tournament.id}/host`}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+            >
+              Värd
+            </Link>
+          </>
+        )}
         <div className="flex-1" />
         <button
           onClick={() => onArchive(!archived)}

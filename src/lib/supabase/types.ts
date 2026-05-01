@@ -38,6 +38,7 @@ export type Tournament = {
   games_per_match: number;
   current_round: number;
   total_rounds: number;
+  scheduled_at: string | null;
   archived_at: string | null;
   created_at: string;
 };
@@ -54,7 +55,7 @@ export type TournamentTeam = {
   tournament_id: string;
   group_id: string | null;
   player1_id: string;
-  player2_id: string;
+  player2_id: string | null;
   seed: number | null;
 };
 
@@ -84,7 +85,7 @@ export type TournamentMatch = {
 
 export type TournamentTeamWithPlayers = TournamentTeam & {
   player1: Player;
-  player2: Player;
+  player2: Player | null;
 };
 
 export type TournamentMatchWithTeams = TournamentMatch & {

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getTenantBySlug } from "@/lib/db/tenants";
 import { getTournamentById } from "@/lib/db/tournaments";
 import { HostView } from "./HostView";
@@ -13,5 +13,8 @@ export default async function TournamentHostPage({
   if (!tenant) notFound();
   const tournament = await getTournamentById(id);
   if (!tournament || tournament.tenant_id !== tenant.id) notFound();
+  if (tournament.status === "draft") {
+    redirect(`/${tenant.slug}/tournament/${tournament.id}/plan`);
+  }
   return <HostView tenant={tenant} tournamentId={tournament.id} />;
 }

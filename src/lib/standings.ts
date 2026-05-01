@@ -38,7 +38,7 @@ export function teamName(
   players: Map<string, Player>
 ): string {
   const p1 = players.get(team.player1_id);
-  const p2 = players.get(team.player2_id);
+  const p2 = team.player2_id ? players.get(team.player2_id) : null;
   return `${p1?.name ?? "?"} & ${p2?.name ?? "?"}`;
 }
 
@@ -55,7 +55,8 @@ export function shortTeamName(
   team: TournamentTeam,
   players: Map<string, Player>
 ): string {
-  return `${shortName(players.get(team.player1_id))} & ${shortName(players.get(team.player2_id))}`;
+  const p2 = team.player2_id ? players.get(team.player2_id) : null;
+  return `${shortName(players.get(team.player1_id))} & ${shortName(p2)}`;
 }
 
 export function computeStandings(

@@ -76,6 +76,125 @@ export async function createTournament(input: CreateTournamentInput): Promise<To
   return data as Tournament;
 }
 
+export type CreateDraftInput = {
+  tenant_id: string;
+  name: string;
+  format: TournamentFormat;
+  scheduled_at: string | null;
+};
+
+export async function createDraftTournament(
+  input: CreateDraftInput
+): Promise<Tournament> {
+  const { data, error } = await supabaseClient
+    .from("tournaments")
+    .insert({
+      tenant_id: input.tenant_id,
+      name: input.name,
+      format: input.format,
+      scheduled_at: input.scheduled_at,
+      status: "draft",
+      formation: "random",
+      num_groups: 0,
+      games_per_match: 0,
+      total_rounds: 0,
+      current_round: 0,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Tournament;
+}
+
+export type UpdateDraftPlanInput = {
+  name: string;
+  format: TournamentFormat;
+  scheduled_at: string | null;
+};
+
+export async function updateDraftPlan(
+  id: string,
+  patch: UpdateDraftPlanInput
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournaments")
+    .update(patch)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function addDraftTeam(
+  tournamentId: string,
+  player1_id: string,
+  player2_id: string | null
+): Promise<TournamentTeam> {
+  const { data, error } = await supabaseClient
+    .from("tournament_teams")
+    .insert({
+      tournament_id: tournamentId,
+      group_id: null,
+      player1_id,
+      player2_id,
+      seed: null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TournamentTeam;
+}
+
+export async function updateDraftTeam(
+  teamId: string,
+  patch: { player1_id: string; player2_id: string | null }
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournament_teams")
+    .update(patch)
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
+export async function deleteDraftTeam(teamId: string): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournament_teams")
+    .delete()
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
+export async function assignTeamGroup(
+  teamId: string,
+  groupId: string
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournament_teams")
+    .update({ group_id: groupId })
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
+export type ActivateTournamentInput = {
+  num_groups: number;
+  games_per_match: number;
+  total_rounds: number;
+  formation: GroupFormation;
+};
+
+export async function activateTournament(
+  id: string,
+  input: ActivateTournamentInput
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournaments")
+    .update({
+      ...input,
+      status: "active",
+      current_round: 1,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function insertGroups(
   rows: Omit<TournamentGroup, "id">[]
 ): Promise<TournamentGroup[]> {
@@ -113,6 +232,18 @@ export async function getTeamsByTournament(
   tournamentId: string
 ): Promise<TournamentTeam[]> {
   const { data, error } = await supabaseClient
+    .from("tournament_teams")
+    .select("*")
+    .eq("tournament_id", tournamentId);
+  if (error) throw error;
+  return (data ?? []) as TournamentTeam[];
+}
+
+export async function getTeamsByTournamentServer(
+  tournamentId: string
+): Promise<TournamentTeam[]> {
+  const sb = getSupabaseServer();
+  const { data, error } = await sb
     .from("tournament_teams")
     .select("*")
     .eq("tournament_id", tournamentId);

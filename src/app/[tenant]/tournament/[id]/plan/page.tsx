@@ -6,6 +6,7 @@ import {
 } from "@/lib/db/tournaments";
 import { getPlayersByTenant } from "@/lib/db/players";
 import { getRegistrationsByTournamentServer } from "@/lib/db/registrations";
+import { requireTenantAccess } from "@/lib/auth/require";
 import { PlanView } from "./PlanView";
 
 export default async function TournamentPlanPage({
@@ -14,6 +15,7 @@ export default async function TournamentPlanPage({
   params: Promise<{ tenant: string; id: string }>;
 }) {
   const { tenant: slug, id } = await params;
+  await requireTenantAccess(slug);
   const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
   const tournament = await getTournamentById(id);

@@ -1,20 +1,30 @@
-import Link from "next/link";
+import { CTASection } from "@/components/marketing/CTASection";
+import { FAQ } from "@/components/marketing/FAQ";
+import { Footer } from "@/components/marketing/Footer";
+import { Formats } from "@/components/marketing/Formats";
+import { Hero } from "@/components/marketing/Hero";
+import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { Nav } from "@/components/marketing/Nav";
+import { TVShowcase } from "@/components/marketing/TVShowcase";
+import { ValueProps } from "@/components/marketing/ValueProps";
+import { WhiteLabel } from "@/components/marketing/WhiteLabel";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f0f0f] px-6 text-center">
-      <h1 className="text-5xl font-semibold tracking-tight text-white sm:text-6xl">
-        Smashboard
-      </h1>
-      <p className="mt-4 text-lg text-zinc-400">
-        Padel tournament management
-      </p>
-      <Link
-        href="/demo/tournament/new"
-        className="mt-10 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition-colors hover:bg-zinc-200"
-      >
-        Open demo <span aria-hidden>→</span>
-      </Link>
-    </div>
+    <main
+      className="font-sans"
+      style={{ backgroundColor: "#ffffff", color: "#0a0a0a" }}
+    >
+      <Nav />
+      <Hero />
+      <ValueProps />
+      <TVShowcase />
+      <Formats />
+      <HowItWorks />
+      <WhiteLabel />
+      <CTASection />
+      <FAQ />
+      <Footer />
+    </main>
   );
 }

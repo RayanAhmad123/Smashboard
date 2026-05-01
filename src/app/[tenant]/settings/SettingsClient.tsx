@@ -93,7 +93,14 @@ export function SettingsClient({
       await deleteCourt(c.id);
       setCourts((prev) => prev.filter((x) => x.id !== c.id));
     } catch (e) {
-      setErr((e as Error).message);
+      const er = e as { code?: string; message?: string };
+      const isFk =
+        er.code === "23503" || /foreign key/i.test(er.message || "");
+      setErr(
+        isFk
+          ? `${c.name} används av en eller flera tävlingar och kan inte tas bort. Ta bort eller arkivera tävlingarna som har spelats på den här banan först.`
+          : er.message || "Ett fel uppstod."
+      );
     } finally {
       setBusy(null);
     }

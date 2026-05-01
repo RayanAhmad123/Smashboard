@@ -23,7 +23,7 @@ export default async function AdminPage() {
   const [{ data: tenants }, { data: links }, { data: usersResp }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, slug, name, primary_color, created_at")
+      .select("id, slug, name, primary_color, logo_url, created_at")
       .order("created_at", { ascending: false }),
     admin.from("tenant_users").select("tenant_id, user_id, role"),
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -49,6 +49,7 @@ export default async function AdminPage() {
       slug: t.slug,
       name: t.name,
       primary_color: t.primary_color,
+      logo_url: t.logo_url,
       created_at: t.created_at,
       owners,
       memberCount: tenantLinks.length,

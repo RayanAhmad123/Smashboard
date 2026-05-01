@@ -23,6 +23,7 @@ export async function registerCustomer(input: {
   slug: string;
   name: string;
   primary_color: string;
+  logo_url?: string | null;
   ownerEmail: string;
 }): Promise<{ ok: true; tenantId: string } | { ok: false; error: string }> {
   await requireSuperAdmin();
@@ -30,17 +31,25 @@ export async function registerCustomer(input: {
   const slug = input.slug.trim().toLowerCase();
   const name = input.name.trim();
   const email = input.ownerEmail.trim().toLowerCase();
+  const logoUrl = input.logo_url?.trim() || null;
 
   if (!SLUG_RE.test(slug)) return { ok: false, error: "Subdomän måste vara 2–31 tecken (a–z, 0–9, -)" };
   if (RESERVED_SLUGS.has(slug)) return { ok: false, error: "Reserverad subdomän" };
   if (!name) return { ok: false, error: "Företagsnamn krävs" };
   if (!email.includes("@")) return { ok: false, error: "Ogiltig e-post" };
+  if (logoUrl && !/^https?:\/\//i.test(logoUrl))
+    return { ok: false, error: "Logo URL måste börja med http(s)://" };
 
   const admin = getServiceRoleClient();
 
   const { data: tenant, error: tErr } = await admin
     .from("tenants")
-    .insert({ slug, name, primary_color: input.primary_color })
+    .insert({
+      slug,
+      name,
+      primary_color: input.primary_color,
+      logo_url: logoUrl,
+    })
     .select("id")
     .single();
   if (tErr || !tenant) return { ok: false, error: tErr?.message ?? "Kunde inte skapa anläggning" };

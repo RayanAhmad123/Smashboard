@@ -9,6 +9,7 @@ export type CustomerRow = {
   slug: string;
   name: string;
   primary_color: string | null;
+  logo_url: string | null;
   created_at: string;
   owners: { email: string; confirmed: boolean }[];
   memberCount: number;
@@ -23,6 +24,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [color, setColor] = useState("#9fc843");
+  const [logoUrl, setLogoUrl] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
         slug: slug.trim().toLowerCase(),
         name: name.trim(),
         primary_color: color,
+        logo_url: logoUrl.trim() || null,
         ownerEmail: ownerEmail.trim(),
       });
       if (!r.ok) {
@@ -52,6 +55,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
       setSlug("");
       setName("");
       setOwnerEmail("");
+      setLogoUrl("");
       router.refresh();
     });
   }
@@ -83,7 +87,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 p-8">
+    <main className="min-h-screen bg-neutral-50 text-neutral-900 p-8">
       <div className="max-w-4xl mx-auto">
         <header className="flex items-center justify-between mb-6">
           <div>
@@ -106,7 +110,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
             Skapar anläggning + skickar inbjudan till ägaren i ett steg.
           </p>
           <form onSubmit={onRegister} className="grid grid-cols-1 md:grid-cols-6 gap-3">
-            <div className="md:col-span-3">
+            <div className="md:col-span-4">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
                 Företagsnamn
               </label>
@@ -115,36 +119,60 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Bon Padel"
-                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white placeholder:text-neutral-400"
               />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
                 Subdomän
               </label>
-              <div className="flex items-center border border-neutral-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500">
+              <div className="flex items-center border border-neutral-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 bg-white">
                 <input
                   required
                   value={slug}
                   onChange={(e) => setSlug(e.target.value.toLowerCase())}
                   placeholder="bonpadel"
-                  className="flex-1 px-3 py-2 text-sm outline-none"
+                  className="flex-1 px-3 py-2 text-sm outline-none text-neutral-900 placeholder:text-neutral-400"
                 />
                 <span className="px-3 py-2 text-sm text-neutral-500 bg-neutral-50 border-l border-neutral-300">
                   .{APP_DOMAIN}
                 </span>
               </div>
             </div>
-            <div className="md:col-span-1">
+            <div className="md:col-span-2">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
                 Färg
               </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="border border-neutral-300 rounded-lg h-10 w-14 cursor-pointer bg-white"
+                />
+                <input
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-neutral-300 bg-white font-mono text-xs text-neutral-900"
+                />
+              </div>
+            </div>
+            <div className="md:col-span-3">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Logo URL <span className="text-neutral-400">(valfritt)</span>
+              </label>
               <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="border border-neutral-300 rounded-lg h-10 w-full"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://bonpadel.se/logo.png"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white placeholder:text-neutral-400"
               />
+            </div>
+            <div className="md:col-span-1">
+              <label className="block text-xs font-medium text-neutral-600 mb-1">
+                Förhandsvisning
+              </label>
+              <BrandPreview name={name} color={color} logoUrl={logoUrl} />
             </div>
             <div className="md:col-span-6">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
@@ -156,7 +184,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
                 value={ownerEmail}
                 onChange={(e) => setOwnerEmail(e.target.value)}
                 placeholder="agare@bonpadel.se"
-                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white placeholder:text-neutral-400"
               />
             </div>
             <button
@@ -189,13 +217,22 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3 min-w-0">
                         <span
-                          className="inline-flex items-center justify-center h-10 w-10 rounded-lg font-black shrink-0"
+                          className="inline-flex items-center justify-center h-10 w-10 rounded-lg font-black shrink-0 overflow-hidden"
                           style={{ backgroundColor: `${accent}22`, color: accent }}
                         >
-                          {c.name.charAt(0).toUpperCase()}
+                          {c.logo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={c.logo_url}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            c.name.charAt(0).toUpperCase()
+                          )}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{c.name}</p>
+                          <p className="font-medium truncate text-neutral-900">{c.name}</p>
                           <a
                             className="text-sm text-neutral-500 hover:text-neutral-900 underline"
                             href={`https://${c.slug}.${APP_DOMAIN}`}
@@ -259,7 +296,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
                             value={reinviteEmail}
                             onChange={(e) => setReinviteEmail(e.target.value)}
                             placeholder="ny@email.se"
-                            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1"
+                            className="border border-neutral-300 rounded-lg px-3 py-2 text-sm flex-1 text-neutral-900 bg-white placeholder:text-neutral-400"
                           />
                           <button
                             onClick={() => onReinvite(c.id)}
@@ -282,5 +319,44 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
         </section>
       </div>
     </main>
+  );
+}
+
+function BrandPreview({
+  name,
+  color,
+  logoUrl,
+}: {
+  name: string;
+  color: string;
+  logoUrl: string;
+}) {
+  const accent = color || "#9fc843";
+  const initial = (name || "?").charAt(0).toUpperCase();
+  const validLogo = /^https?:\/\//i.test(logoUrl.trim());
+  return (
+    <div className="h-10 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2">
+      <span
+        className="inline-flex items-center justify-center h-7 w-7 rounded-md font-black text-sm overflow-hidden shrink-0"
+        style={{ backgroundColor: `${accent}22`, color: accent }}
+      >
+        {validLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          initial
+        )}
+      </span>
+      <span
+        className="px-2 py-1 rounded-md text-white text-[11px] font-semibold"
+        style={{ backgroundColor: accent }}
+      >
+        Knapp
+      </span>
+    </div>
   );
 }

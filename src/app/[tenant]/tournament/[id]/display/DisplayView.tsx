@@ -463,22 +463,13 @@ function CourtCard({
   const isFinal = match?.stage === "final";
 
   return (
-    <div
-      className="relative rounded-3xl overflow-hidden flex flex-col bg-white border"
-      style={{
-        borderColor: live ? accent : "rgba(0,0,0,0.08)",
-        boxShadow: live
-          ? `0 0 0 1px ${accent}88, 0 10px 30px -12px ${accent}66`
-          : "0 4px 18px -10px rgba(0,0,0,0.18)",
-      }}
-    >
-      {/* faint court watermark */}
+    <div className="relative overflow-hidden flex flex-col">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/icons/court-topdown.svg"
         alt=""
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-contain object-center opacity-[0.07] pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none"
       />
 
       {/* top bar */}

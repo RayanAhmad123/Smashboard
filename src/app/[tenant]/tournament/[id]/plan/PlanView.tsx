@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
@@ -464,6 +464,13 @@ function AddPlayerRow({
     [options, p1]
   );
 
+  // Move focus to the second field after p1 is set — doing this in a useEffect
+  // (instead of synchronously inside onSelect) ensures the second input has
+  // re-rendered before we try to focus it.
+  useEffect(() => {
+    if (paired && p1) ref2.current?.focus();
+  }, [paired, p1]);
+
   function reset(focusFirst = true) {
     setP1(null);
     ref1.current?.clear();
@@ -519,10 +526,7 @@ function AddPlayerRow({
           value={p1}
           selectedName={p1Name}
           options={options}
-          onSelect={(id) => {
-            setP1(id);
-            ref2.current?.focus();
-          }}
+          onSelect={(id) => setP1(id)}
           placeholder="Spelare 1 — skriv namn…"
         />
         <PlayerCombobox
@@ -530,7 +534,6 @@ function AddPlayerRow({
           value={null}
           selectedName={null}
           options={p2Options}
-          disabled={!p1}
           onSelect={(id) => {
             if (!p1) return;
             onAdd(p1, id);

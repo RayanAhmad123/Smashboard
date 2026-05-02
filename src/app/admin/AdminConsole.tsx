@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { registerCustomer, inviteOwner, deleteTenant } from "./actions";
+import { registerCustomer, inviteOwner, deleteTenant, uploadLogo } from "./actions";
 
 export type CustomerRow = {
   id: string;
@@ -25,6 +25,10 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#9fc843");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [ownerEmail, setOwnerEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -33,16 +37,47 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
   const [reinviteEmail, setReinviteEmail] = useState("");
   const [reinviteMsg, setReinviteMsg] = useState<string | null>(null);
 
+  function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setLogoFile(file);
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(file ? URL.createObjectURL(file) : null);
+    setLogoUrl("");
+  }
+
+  function clearLogo() {
+    setLogoFile(null);
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(null);
+    setLogoUrl("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   function onRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
     start(async () => {
+      let resolvedLogoUrl: string | null = null;
+
+      if (logoFile) {
+        setUploading(true);
+        const fd = new FormData();
+        fd.append("file", logoFile);
+        const up = await uploadLogo(fd);
+        setUploading(false);
+        if (!up.ok) {
+          setError(up.error);
+          return;
+        }
+        resolvedLogoUrl = up.url;
+      }
+
       const r = await registerCustomer({
         slug: slug.trim().toLowerCase(),
         name: name.trim(),
         primary_color: color,
-        logo_url: logoUrl.trim() || null,
+        logo_url: resolvedLogoUrl,
         ownerEmail: ownerEmail.trim(),
       });
       if (!r.ok) {
@@ -55,7 +90,7 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
       setSlug("");
       setName("");
       setOwnerEmail("");
-      setLogoUrl("");
+      clearLogo();
       router.refresh();
     });
   }
@@ -159,20 +194,44 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
             </div>
             <div className="md:col-span-3">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
-                Logo URL <span className="text-neutral-400">(valfritt)</span>
+                Logotyp <span className="text-neutral-400">(valfritt)</span>
               </label>
-              <input
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://bonpadel.se/logo.png"
-                className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-900 bg-white placeholder:text-neutral-400"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                  onChange={onLogoChange}
+                  className="hidden"
+                  id="logo-file-input"
+                />
+                <label
+                  htmlFor="logo-file-input"
+                  className="cursor-pointer flex items-center gap-2 border border-neutral-300 rounded-lg px-3 py-2 text-sm text-neutral-600 bg-white hover:bg-neutral-50 transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                  </svg>
+                  {logoFile ? logoFile.name : "Välj fil…"}
+                </label>
+                {logoFile && (
+                  <button
+                    type="button"
+                    onClick={clearLogo}
+                    className="text-neutral-400 hover:text-neutral-700 text-lg leading-none"
+                    aria-label="Ta bort logo"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-neutral-400">PNG, JPEG, WebP, SVG · max 2 MB</p>
             </div>
             <div className="md:col-span-1">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
                 Förhandsvisning
               </label>
-              <BrandPreview name={name} color={color} logoUrl={logoUrl} />
+              <BrandPreview name={name} color={color} logoUrl={logoPreview ?? logoUrl} />
             </div>
             <div className="md:col-span-6">
               <label className="block text-xs font-medium text-neutral-600 mb-1">
@@ -189,10 +248,10 @@ export function AdminConsole({ customers }: { customers: CustomerRow[] }) {
             </div>
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || uploading}
               className="md:col-span-6 bg-neutral-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
             >
-              {pending ? "Registrerar…" : "Registrera kund + skicka inbjudan"}
+              {uploading ? "Laddar upp logotyp…" : pending ? "Registrerar…" : "Registrera kund + skicka inbjudan"}
             </button>
             {error && <p className="text-sm text-red-600 md:col-span-6">{error}</p>}
             {successMsg && (
@@ -333,7 +392,7 @@ function BrandPreview({
 }) {
   const accent = color || "#9fc843";
   const initial = (name || "?").charAt(0).toUpperCase();
-  const validLogo = /^https?:\/\//i.test(logoUrl.trim());
+  const validLogo = /^(https?:|blob:)/i.test(logoUrl.trim());
   return (
     <div className="h-10 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2">
       <span

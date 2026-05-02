@@ -29,7 +29,7 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
     { href: `${base}/settings`, label: "Inställningar" },
   ];
   return (
-    <header className="border-b border-zinc-200 bg-white sticky top-0 z-30">
+    <header className="border-b border-zinc-200 bg-white sticky top-0 z-30 relative">
       <div className="px-6 py-3 flex items-center gap-6">
         <Link href={base} className="flex items-center gap-2 shrink-0">
           {logoUrl ? (
@@ -43,7 +43,7 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
               {name.charAt(0)}
             </span>
           )}
-          <span className="font-semibold text-zinc-900 truncate">{name}</span>
+          {!logoUrl && <span className="font-semibold text-zinc-900 truncate">{name}</span>}
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {items.map((it) => {
@@ -67,6 +67,10 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
           })}
         </nav>
         <div className="flex-1" />
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/triad-logo.png" alt="Triad Solutions" className="h-7 w-auto" />
+        </div>
         <Link
           href={`${base}/tournament/new`}
           className="px-3 py-1.5 rounded-md text-white text-sm font-semibold shadow-sm"

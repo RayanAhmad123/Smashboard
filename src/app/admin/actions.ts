@@ -19,6 +19,38 @@ function getServiceRoleClient() {
   });
 }
 
+const LOGO_BUCKET = "tenant-logos";
+const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"]);
+const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+
+export async function uploadLogo(
+  formData: FormData
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireSuperAdmin();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0)
+    return { ok: false, error: "Ingen fil" };
+  if (!ALLOWED_MIME.has(file.type))
+    return { ok: false, error: "Ogiltigt filformat (PNG, JPEG, WebP, SVG, GIF)" };
+  if (file.size > MAX_BYTES)
+    return { ok: false, error: "Filen är för stor (max 2 MB)" };
+
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `${Date.now()}.${ext}`;
+
+  const admin = getServiceRoleClient();
+  const bytes = await file.arrayBuffer();
+
+  const { error } = await admin.storage
+    .from(LOGO_BUCKET)
+    .upload(path, bytes, { contentType: file.type, upsert: false });
+  if (error) return { ok: false, error: error.message };
+
+  const { data } = admin.storage.from(LOGO_BUCKET).getPublicUrl(path);
+  return { ok: true, url: data.publicUrl };
+}
+
 export async function registerCustomer(input: {
   slug: string;
   name: string;

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentRegistration } from "@/lib/supabase/types";
 import { submitRegistration } from "@/lib/db/registrations";
+import { saveBooking } from "@/lib/playerBookings";
 
 const FORMAT_LABEL: Record<string, string> = {
   gruppspel: "Gruppspel",
@@ -72,6 +73,11 @@ export function RegisterClient({
         player2_name: mode === "pair" ? name2.trim() : null,
         player2_phone: mode === "pair" ? phone2.trim() || null : null,
       });
+      saveBooking(tenant.slug, {
+        id: reg.id,
+        tournamentId: tournament.id,
+        createdAt: reg.created_at,
+      });
       setDone(reg);
     } catch (e) {
       setErr((e as Error).message || "Något gick fel. Försök igen.");
@@ -102,13 +108,22 @@ export function RegisterClient({
           <p className="text-sm text-zinc-500">
             {tournament.name} · {formatScheduled(tournament.scheduled_at)}
           </p>
-          <Link
-            href={`/${tenant.slug}/play`}
-            className="inline-block mt-8 text-sm font-medium underline"
-            style={{ color: accent }}
-          >
-            ← Andra sessioner
-          </Link>
+          <div className="mt-8 flex items-center justify-center gap-5 text-sm font-medium">
+            <Link
+              href={`/${tenant.slug}/play`}
+              className="underline"
+              style={{ color: accent }}
+            >
+              ← Andra sessioner
+            </Link>
+            <Link
+              href={`/${tenant.slug}/play?tab=mina`}
+              className="underline"
+              style={{ color: accent }}
+            >
+              Mina bokningar
+            </Link>
+          </div>
         </div>
       </div>
     );

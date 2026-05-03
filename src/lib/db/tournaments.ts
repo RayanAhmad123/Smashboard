@@ -287,6 +287,52 @@ export async function getTeamsByTournamentServer(
   return (data ?? []) as TournamentTeam[];
 }
 
+export type PlannedSessionStats = {
+  tournament_id: string;
+  team_count: number;
+  pending_count: number;
+  solo_count: number;
+};
+
+export async function getPlannedStats(
+  tournamentIds: string[]
+): Promise<PlannedSessionStats[]> {
+  if (tournamentIds.length === 0) return [];
+  const sb = getSupabaseServer();
+
+  const [{ data: regs, error: regErr }, { data: teams, error: teamErr }] =
+    await Promise.all([
+      sb
+        .from("tournament_registrations")
+        .select("tournament_id, status")
+        .in("tournament_id", tournamentIds),
+      sb
+        .from("tournament_teams")
+        .select("tournament_id, player2_id")
+        .in("tournament_id", tournamentIds),
+    ]);
+
+  if (regErr) throw regErr;
+  if (teamErr) throw teamErr;
+
+  const map = new Map<string, PlannedSessionStats>();
+  for (const id of tournamentIds) {
+    map.set(id, { tournament_id: id, team_count: 0, pending_count: 0, solo_count: 0 });
+  }
+  for (const r of regs ?? []) {
+    const s = map.get(r.tournament_id);
+    if (!s) continue;
+    if (r.status === "pending") s.pending_count++;
+  }
+  for (const t of teams ?? []) {
+    const s = map.get(t.tournament_id);
+    if (!s) continue;
+    s.team_count++;
+    if (!t.player2_id) s.solo_count++;
+  }
+  return [...map.values()];
+}
+
 export async function getGroupsByTournament(
   tournamentId: string
 ): Promise<TournamentGroup[]> {

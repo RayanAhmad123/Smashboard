@@ -16,7 +16,9 @@ import {
   addDraftTeam,
   updateDraftTeam,
   deleteDraftTeam,
+  markTeamPaid,
 } from "@/lib/db/tournaments";
+import { PaymentPanel, type PaymentTeamRow } from "@/components/PaymentPanel";
 import {
   setTournamentRegistrationOpen,
   approveRegistration,
@@ -68,6 +70,8 @@ export function PlanView({
   const [teams, setTeams] = useState<TournamentTeam[]>(initialTeams);
   const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const [planTab, setPlanTab] = useState<"lag" | "betalning">("lag");
 
   const [openReg, setOpenReg] = useState(tournament.open_registration);
   const [maxTeamsInput, setMaxTeamsInput] = useState(
@@ -246,6 +250,30 @@ export function PlanView({
       scheduledLocal !== toLocalInputValue(tournament.scheduled_at)
     );
   }
+
+  async function markPaid(teamId: string) {
+    await markTeamPaid(teamId);
+    setTeams((prev) =>
+      prev.map((t) =>
+        t.id === teamId ? { ...t, paid_at: new Date().toISOString() } : t
+      )
+    );
+  }
+
+  const paymentRows: PaymentTeamRow[] = useMemo(
+    () =>
+      teams.map((t) => ({
+        id: t.id,
+        displayName: [
+          playerMap.get(t.player1_id)?.name,
+          t.player2_id ? playerMap.get(t.player2_id)?.name : null,
+        ]
+          .filter(Boolean)
+          .join(" & "),
+        paid: t.paid_at !== null,
+      })),
+    [teams, playerMap]
+  );
 
   function goStart() {
     router.push(`/${tenant.slug}/tournament/${tournament.id}/start`);
@@ -483,66 +511,92 @@ export function PlanView({
         </section>
 
         <section className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <div className="mb-3">
-              <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2 flex-wrap">
-                <span>
-                  {showsTeams ? "Lag" : "Spelare"} ({teams.length})
-                </span>
-                {showsTeams && soloTeams.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium border border-amber-200">
-                    {soloTeams.length} letar partner
-                  </span>
-                )}
-              </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {showsTeams
-                  ? "Skriv namnet på en spelare för att lägga till — para ihop dem nedan."
-                  : "Skriv namnet på en spelare för att lägga till. Lag bildas vid varje runda."}
-              </p>
-            </div>
-
-            <AddPlayerRow
-              accent={accent}
-              paired={showsTeams}
-              options={unassignedPlayers}
-              onAdd={(p1, p2) => addTeam(p1, p2)}
-            />
-
-            <div className="space-y-2 mt-3">
-              {teams.length === 0 && (
-                <div className="text-center text-sm text-zinc-500 py-8 border border-dashed border-zinc-200 rounded-lg">
-                  Inga {showsTeams ? "lag" : "spelare"} ännu.
-                </div>
-              )}
-              {teams.map((t, idx) => (
-                <TeamRow
-                  key={t.id}
-                  idx={idx}
-                  team={t}
-                  players={players}
-                  playerMap={playerMap}
-                  assignedSet={assignedSet}
-                  busy={busyTeamId === t.id}
-                  showSecondSlot={showsTeams}
-                  onChangeP1={(v) => setSlot(t.id, "player1_id", v)}
-                  onChangeP2={(v) =>
-                    setSlot(t.id, "player2_id", v || null)
-                  }
-                  onRemove={() => removeTeam(t.id)}
-                />
+          <div className="rounded-xl border border-zinc-200 bg-white">
+            <div className="flex items-center gap-0 border-b border-zinc-200 px-4 pt-3">
+              {(["lag", "betalning"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setPlanTab(t)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${
+                    planTab === t
+                      ? "text-zinc-900"
+                      : "text-zinc-500 border-transparent hover:text-zinc-700"
+                  }`}
+                  style={planTab === t ? { borderColor: accent } : undefined}
+                >
+                  {t === "lag"
+                    ? `${showsTeams ? "Lag" : "Spelare"} (${teams.length})`
+                    : "Betalning"}
+                </button>
               ))}
             </div>
 
-            {showsTeams && soloTeams.length > 0 && (
-              <div className="mt-4 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-                {soloTeams.length} spelare letar partner. Du kan starta
-                ändå — para ihop dem i nästa steg.
-              </div>
-            )}
+            <div className="p-4">
+              {planTab === "lag" ? (
+                <>
+                  <div className="mb-3">
+                    {showsTeams && soloTeams.length > 0 && (
+                      <span className="inline-flex px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium border border-amber-200">
+                        {soloTeams.length} letar partner
+                      </span>
+                    )}
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {showsTeams
+                        ? "Skriv namnet på en spelare för att lägga till — para ihop dem nedan."
+                        : "Skriv namnet på en spelare för att lägga till. Lag bildas vid varje runda."}
+                    </p>
+                  </div>
+
+                  <AddPlayerRow
+                    accent={accent}
+                    paired={showsTeams}
+                    options={unassignedPlayers}
+                    onAdd={(p1, p2) => addTeam(p1, p2)}
+                  />
+
+                  <div className="space-y-2 mt-3">
+                    {teams.length === 0 && (
+                      <div className="text-center text-sm text-zinc-500 py-8 border border-dashed border-zinc-200 rounded-lg">
+                        Inga {showsTeams ? "lag" : "spelare"} ännu.
+                      </div>
+                    )}
+                    {teams.map((t, idx) => (
+                      <TeamRow
+                        key={t.id}
+                        idx={idx}
+                        team={t}
+                        players={players}
+                        playerMap={playerMap}
+                        assignedSet={assignedSet}
+                        busy={busyTeamId === t.id}
+                        showSecondSlot={showsTeams}
+                        onChangeP1={(v) => setSlot(t.id, "player1_id", v)}
+                        onChangeP2={(v) =>
+                          setSlot(t.id, "player2_id", v || null)
+                        }
+                        onRemove={() => removeTeam(t.id)}
+                      />
+                    ))}
+                  </div>
+
+                  {showsTeams && soloTeams.length > 0 && (
+                    <div className="mt-4 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                      {soloTeams.length} spelare letar partner. Du kan starta
+                      ändå — para ihop dem i nästa steg.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <PaymentPanel
+                  teams={paymentRows}
+                  accent={accent}
+                  onMarkPaid={markPaid}
+                />
+              )}
+            </div>
           </div>
 
-          {unassignedPlayers.length > 0 && (
+          {planTab === "lag" && unassignedPlayers.length > 0 && (
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
               <h2 className="text-sm font-semibold text-zinc-700 mb-1">
                 Ej tilldelade ({unassignedPlayers.length})

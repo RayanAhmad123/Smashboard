@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
 
 type Props = {
   slug: string;
@@ -86,18 +85,6 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
             Logga ut
           </button>
         </form>
-        <Link
-          href="/"
-          className="hidden md:block text-zinc-400 hover:text-zinc-600"
-          aria-label="Smashboard"
-        >
-          <Image
-            src="/icons/logo.svg"
-            alt="Smashboard"
-            width={92}
-            height={28}
-          />
-        </Link>
       </div>
     </header>
   );

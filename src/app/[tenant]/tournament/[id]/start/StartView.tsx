@@ -377,7 +377,7 @@ export function StartView({
           </div>
           <div>
             <label className="text-xs font-medium block mb-1 text-zinc-500">
-              Game per match
+              Spel per match
             </label>
             <input
               type="number"

@@ -27,11 +27,11 @@ import {
   type PlayerComboboxHandle,
 } from "@/components/PlayerCombobox";
 
-const FORMAT_OPTIONS: { value: TournamentFormat; label: string }[] = [
-  { value: "gruppspel", label: "Gruppspel" },
-  { value: "mexicano", label: "Mexicano" },
-  { value: "americano", label: "Americano" },
-  { value: "team_mexicano", label: "Lag-Mexicano" },
+const FORMAT_OPTIONS: { value: TournamentFormat; label: string; available: boolean }[] = [
+  { value: "gruppspel", label: "Gruppspel", available: true },
+  { value: "mexicano", label: "Mexicano (Kommer snart)", available: false },
+  { value: "americano", label: "Americano (Kommer snart)", available: false },
+  { value: "team_mexicano", label: "Lag-Mexicano (Kommer snart)", available: false },
 ];
 
 function toLocalInputValue(iso: string | null): string {
@@ -323,7 +323,7 @@ export function PlanView({
                 onBlur={() => metaDirty() && saveMeta()}
               >
                 {FORMAT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <option key={o.value} value={o.value} disabled={!o.available && o.value !== format}>
                     {o.label}
                   </option>
                 ))}
@@ -544,17 +544,20 @@ export function PlanView({
 
           {unassignedPlayers.length > 0 && (
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-zinc-700 mb-2">
+              <h2 className="text-sm font-semibold text-zinc-700 mb-1">
                 Ej tilldelade ({unassignedPlayers.length})
               </h2>
+              <p className="text-xs text-zinc-400 mb-2">Klicka för att lägga till</p>
               <div className="flex flex-wrap gap-1.5">
                 {unassignedPlayers.map((p) => (
-                  <span
+                  <button
                     key={p.id}
-                    className="px-2 py-1 rounded bg-zinc-100 text-xs"
+                    type="button"
+                    onClick={() => addTeam(p.id, null)}
+                    className="px-2 py-1 rounded bg-zinc-100 text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
                   >
-                    {p.name}
-                  </span>
+                    + {p.name}
+                  </button>
                 ))}
               </div>
             </div>

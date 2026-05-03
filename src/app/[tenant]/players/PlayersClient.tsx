@@ -21,6 +21,7 @@ export function PlayersClient({
   tenant: Tenant;
   initialPlayers: Player[];
 }) {
+  const accent = tenant.primary_color || "#10b981";
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -75,13 +76,14 @@ export function PlayersClient({
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200 px-8 py-6 flex items-center justify-between">
+      <header className="border-b border-zinc-200 px-4 sm:px-8 py-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Spelare</h1>
           <p className="text-sm text-zinc-500">{tenant.name}</p>
         </div>
         <button
-          className="px-4 py-2 rounded-md bg-zinc-900 text-white text-sm font-medium"
+          className="px-4 py-2 rounded-md text-white text-sm font-medium shrink-0"
+          style={{ backgroundColor: accent }}
           onClick={() => setAdding((v) => !v)}
         >
           {adding ? "Avbryt" : "Lägg till spelare"}
@@ -89,23 +91,25 @@ export function PlayersClient({
       </header>
 
       {err && (
-        <div className="mx-8 mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="mx-4 sm:mx-8 mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
           {err}
         </div>
       )}
 
       {adding && (
-        <div className="mx-8 mt-6 p-4 rounded-lg border border-zinc-200 bg-white flex gap-3 items-end">
+        <div className="mx-4 sm:mx-8 mt-6 p-4 rounded-lg border border-zinc-200 bg-white flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
             <label className="text-xs text-zinc-500 block mb-1">Namn</label>
             <input
+              autoFocus
               className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPlayer()}
               placeholder="Förnamn Efternamn"
             />
           </div>
-          <div className="w-32">
+          <div className="sm:w-32">
             <label className="text-xs text-zinc-500 block mb-1">Nivå</label>
             <select
               className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900"
@@ -120,7 +124,8 @@ export function PlayersClient({
             </select>
           </div>
           <button
-            className="px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium disabled:opacity-50"
+            className="px-4 py-2 rounded-md text-white text-sm font-medium disabled:opacity-50"
+            style={{ backgroundColor: accent }}
             disabled={busy || !name.trim()}
             onClick={addPlayer}
           >
@@ -129,9 +134,9 @@ export function PlayersClient({
         </div>
       )}
 
-      <main className="p-8">
-        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-          <table className="w-full text-sm">
+      <main className="p-4 sm:p-8">
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+          <table className="w-full text-sm min-w-[400px]">
             <thead className="bg-zinc-50 text-left text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-medium">Namn</th>

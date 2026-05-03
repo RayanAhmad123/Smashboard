@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import type { Tenant, TournamentFormat } from "@/lib/supabase/types";
 import { createDraftTournament } from "@/lib/db/tournaments";
 
-const FORMAT_OPTIONS: { value: TournamentFormat; label: string }[] = [
-  { value: "gruppspel", label: "Gruppspel" },
-  { value: "mexicano", label: "Mexicano" },
-  { value: "americano", label: "Americano" },
-  { value: "team_mexicano", label: "Lag-Mexicano" },
+const FORMAT_OPTIONS: { value: TournamentFormat; label: string; available: boolean }[] = [
+  { value: "gruppspel", label: "Gruppspel", available: true },
+  { value: "mexicano", label: "Mexicano (Kommer snart)", available: false },
+  { value: "americano", label: "Americano (Kommer snart)", available: false },
+  { value: "team_mexicano", label: "Lag-Mexicano (Kommer snart)", available: false },
 ];
 
 function defaultScheduledAt(): string {
@@ -90,7 +90,7 @@ export function NewTournamentWizard({ tenant }: { tenant: Tenant }) {
               onChange={(e) => setFormat(e.target.value as TournamentFormat)}
             >
               {FORMAT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
+                <option key={o.value} value={o.value} disabled={!o.available}>
                   {o.label}
                 </option>
               ))}

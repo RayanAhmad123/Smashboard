@@ -35,21 +35,19 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
       {/* Main row */}
       <div className="px-4 py-3 flex items-center gap-3 relative">
         <Link href={base} className="flex items-center gap-2 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/logo.svg"
+            alt="Smashboard"
+            className="block h-8 w-auto sm:h-10 shrink-0"
+          />
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="h-7 w-auto" />
+            <img src={logoUrl} alt="" className="hidden sm:block h-7 w-auto" />
           ) : (
-            <>
-              <span
-                className="inline-flex items-center justify-center h-7 w-7 rounded-md font-black text-sm shrink-0"
-                style={{ backgroundColor: `${accent}22`, color: accent }}
-              >
-                {name.charAt(0)}
-              </span>
-              <span className="font-semibold text-zinc-900 truncate hidden sm:block">
-                {name}
-              </span>
-            </>
+            <span className="font-semibold text-zinc-900 truncate hidden sm:block">
+              {name}
+            </span>
           )}
         </Link>
 

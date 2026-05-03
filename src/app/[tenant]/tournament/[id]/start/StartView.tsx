@@ -15,6 +15,7 @@ import {
   deleteDraftTeam,
   insertGroups,
   insertMatches,
+  insertRoundRests,
   assignTeamGroup,
   activateTournament,
 } from "@/lib/db/tournaments";
@@ -67,6 +68,8 @@ export function StartView({
 
   const [numGroups, setNumGroups] = useState(2);
   const [gamesPerMatch, setGamesPerMatch] = useState(5);
+  const [advancesPerGroup, setAdvancesPerGroup] = useState(0);
+  const [hasBronze, setHasBronze] = useState(false);
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
     new Set(courts.map((c) => c.id))
   );
@@ -147,6 +150,11 @@ export function StartView({
     return counts;
   }, [selectedCourts, courtGroupIdx, numGroups]);
   const allGroupsHaveCourts = groupCourtCounts.every((c) => c >= 1);
+
+  // Recommended courts: floor(teamsPerGroup / 2) simultaneous matches per group.
+  const teamsPerGroup = fullTeamCount > 0 ? Math.floor(fullTeamCount / Math.max(1, numGroups)) : 0;
+  const suggestedCourtsPerGroup = Math.floor(teamsPerGroup / 2);
+  const suggestedTotalCourts = Math.max(1, numGroups * suggestedCourtsPerGroup);
 
   const canSubmit =
     formatSupported &&
@@ -252,8 +260,17 @@ export function StartView({
         );
         courtsByGroupId.set(g.id, own.length > 0 ? own : chosenCourts);
       }
-      const matches = generateGroupMatches(teamsByGroup, courtsByGroupId);
+      const { matches, restingByRound } = generateGroupMatches(teamsByGroup, courtsByGroupId);
       await insertMatches(matches);
+
+      // 5b. Persist resting teams per round.
+      const restRows: { tournament_id: string; round_number: number; team_id: string }[] = [];
+      for (const [roundNumber, teamIds] of restingByRound) {
+        for (const teamId of teamIds) {
+          restRows.push({ tournament_id: tournament.id, round_number: roundNumber, team_id: teamId });
+        }
+      }
+      await insertRoundRests(restRows);
 
       // 6. Activate tournament.
       const teamsPerGroup = nonEmpty.map((b) => b.length);
@@ -263,6 +280,8 @@ export function StartView({
         games_per_match: gamesPerMatch,
         total_rounds: totalRounds,
         formation: "random",
+        advances_per_group: advancesPerGroup > 0 ? advancesPerGroup : null,
+        has_bronze: hasBronze,
       });
 
       router.push(`/${tenant.slug}/tournament/${tournament.id}/host`);
@@ -394,16 +413,86 @@ export function StartView({
           </div>
         </section>
 
+        <section className="rounded-xl border border-zinc-200 bg-white p-4 space-y-4">
+          <h2 className="text-sm font-semibold text-zinc-700">Slutspel</h2>
+          <div>
+            <label className="text-xs font-medium block mb-1 text-zinc-500">
+              Lag som går vidare per grupp
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, Math.floor(fullTeamCount / Math.max(1, numGroups)))}
+                value={advancesPerGroup}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setAdvancesPerGroup(v);
+                  if (v === 0) setHasBronze(false);
+                }}
+                className="flex-1"
+              />
+              <span className="text-sm font-semibold tabular-nums w-6 text-center">
+                {advancesPerGroup === 0 ? "–" : advancesPerGroup}
+              </span>
+            </div>
+            {advancesPerGroup > 0 && (
+              <p className="text-xs text-zinc-500 mt-1">
+                {advancesPerGroup * numGroups} lag totalt →{" "}
+                {advancesPerGroup * numGroups <= 2
+                  ? "Final"
+                  : advancesPerGroup * numGroups <= 4
+                    ? "Semifinal → Final"
+                    : "Kvartsfinal → Semifinal → Final"}
+              </p>
+            )}
+            {advancesPerGroup === 0 && (
+              <p className="text-xs text-zinc-400 mt-1">Inget slutspel</p>
+            )}
+          </div>
+          {advancesPerGroup > 0 && (
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-medium text-zinc-700">Bronsmatch</span>
+                <p className="text-xs text-zinc-400">Match om tredjeplats</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHasBronze((v) => !v)}
+                aria-pressed={hasBronze}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${hasBronze ? "" : "bg-zinc-300"}`}
+                style={hasBronze ? { backgroundColor: accent } : undefined}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${hasBronze ? "translate-x-4" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+          )}
+        </section>
+
         <section className="rounded-xl border border-zinc-200 bg-white p-4">
-          <div className="flex items-baseline justify-between mb-2">
-            <h2 className="text-sm font-semibold text-zinc-700">Banor</h2>
+          <div className="flex items-start justify-between mb-2 gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-700">Banor</h2>
+              {fullTeamCount >= 2 && (
+                <p className="text-xs mt-0.5"
+                  style={{
+                    color: selectedCourts.size === suggestedTotalCourts
+                      ? accent
+                      : selectedCourts.size < suggestedTotalCourts
+                        ? "#d97706"
+                        : "#71717a",
+                  }}
+                >
+                  {suggestedTotalCourts} rekommenderas
+                  {numGroups > 1 ? ` (${suggestedCourtsPerGroup} per grupp)` : ""}
+                  {" "}för {fullTeamCount} lag
+                </p>
+              )}
+            </div>
             {numGroups > 1 && selectedCourts.size > 0 && (
-              <span className="text-xs text-zinc-500 tabular-nums">
+              <span className="text-xs text-zinc-500 tabular-nums shrink-0">
                 {groupCourtCounts
-                  .map(
-                    (n, i) =>
-                      `${String.fromCharCode(65 + i)}: ${n}`
-                  )
+                  .map((n, i) => `${String.fromCharCode(65 + i)}: ${n}`)
                   .join(" · ")}
               </span>
             )}

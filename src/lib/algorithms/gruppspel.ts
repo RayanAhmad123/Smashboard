@@ -45,29 +45,32 @@ export function distributeTeamsToGroups(
   }));
 }
 
-function roundRobinPairs(numTeams: number): Array<Array<[number, number] | null>> {
+// Returns round-robin pairs per round. null means that team slot is resting.
+// Returned as [pairIndex] index into the teams array, or null for the bye slot.
+function roundRobinPairs(numTeams: number): Array<{ pairs: Array<[number, number]>; restingIdx: number | null }> {
   const teams = Array.from({ length: numTeams }, (_, i) => i);
   const hasBye = teams.length % 2 === 1;
   if (hasBye) teams.push(-1);
   const n = teams.length;
-  const rounds: Array<Array<[number, number] | null>> = [];
+  const rounds: Array<{ pairs: Array<[number, number]>; restingIdx: number | null }> = [];
 
   const fixed = teams[0];
   let rotating = teams.slice(1);
 
   for (let r = 0; r < n - 1; r++) {
-    const round: Array<[number, number] | null> = [];
+    const pairs: Array<[number, number]> = [];
+    let restingIdx: number | null = null;
     const slot = [fixed, ...rotating];
     for (let i = 0; i < n / 2; i++) {
       const a = slot[i];
       const b = slot[n - 1 - i];
       if (a === -1 || b === -1) {
-        round.push(null);
+        restingIdx = a === -1 ? b : a;
       } else {
-        round.push([a, b]);
+        pairs.push([a, b]);
       }
     }
-    rounds.push(round);
+    rounds.push({ pairs, restingIdx });
     rotating = [rotating[rotating.length - 1], ...rotating.slice(0, -1)];
   }
 
@@ -76,10 +79,18 @@ function roundRobinPairs(numTeams: number): Array<Array<[number, number] | null>
 
 export type GeneratedMatch = Omit<TournamentMatch, "id" | "created_at">;
 
+// Map from round_number (1-based) to resting team_id, for groups with odd team counts.
+export type RestingByRound = Map<number, string[]>;
+
+export type GroupMatchResult = {
+  matches: GeneratedMatch[];
+  restingByRound: RestingByRound;
+};
+
 export function generateGroupMatches(
   teamsByGroup: Map<string, TournamentTeam[]>,
   courtsByGroup: Map<string, Court[]>
-): GeneratedMatch[] {
+): GroupMatchResult {
   const groupIds = Array.from(teamsByGroup.keys());
   for (const gid of groupIds) {
     const c = courtsByGroup.get(gid);
@@ -91,34 +102,45 @@ export function generateGroupMatches(
   const perGroup = groupIds.map((gid) => {
     const teams = teamsByGroup.get(gid)!;
     const rounds = roundRobinPairs(teams.length);
-    return rounds.map((round) =>
-      round
-        .filter((p): p is [number, number] => p !== null)
-        .map(([i, j]) => ({
-          group_id: gid,
-          team1_id: teams[i].id,
-          team2_id: teams[j].id,
-          tournament_id: teams[i].tournament_id,
-        }))
-    );
+    return rounds.map(({ pairs, restingIdx }) => ({
+      gid,
+      tournamentId: teams[0]?.tournament_id ?? "",
+      pairs: pairs.map(([i, j]) => ({
+        group_id: gid,
+        team1_id: teams[i].id,
+        team2_id: teams[j].id,
+        tournament_id: teams[i].tournament_id,
+      })),
+      restingTeamId: restingIdx !== null ? teams[restingIdx].id : null,
+    }));
   });
 
   const totalRounds = Math.max(...perGroup.map((g) => g.length));
   const matches: GeneratedMatch[] = [];
+  const restingByRound: RestingByRound = new Map();
 
   for (let r = 0; r < totalRounds; r++) {
+    const roundNumber = r + 1;
     for (let g = 0; g < perGroup.length; g++) {
       const gid = groupIds[g];
       const groupCourts = courtsByGroup.get(gid)!;
-      const groupRound = perGroup[g][r] ?? [];
+      const groupRound = perGroup[g][r];
+      if (!groupRound) continue;
+
+      if (groupRound.restingTeamId) {
+        const existing = restingByRound.get(roundNumber) ?? [];
+        existing.push(groupRound.restingTeamId);
+        restingByRound.set(roundNumber, existing);
+      }
+
       let courtIdx = 0;
-      for (const m of groupRound) {
+      for (const m of groupRound.pairs) {
         const court = groupCourts[courtIdx % groupCourts.length];
         courtIdx++;
         matches.push({
           tournament_id: m.tournament_id,
           group_id: m.group_id,
-          round_number: r + 1,
+          round_number: roundNumber,
           court_id: court.id,
           team1_id: m.team1_id,
           team2_id: m.team2_id,
@@ -131,7 +153,7 @@ export function generateGroupMatches(
     }
   }
 
-  return matches;
+  return { matches, restingByRound };
 }
 
 export function totalRoundsFor(numTeamsPerGroup: number[]): number {

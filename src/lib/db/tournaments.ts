@@ -7,6 +7,7 @@ import type {
   TournamentGroup,
   TournamentTeam,
   TournamentMatch,
+  RoundRest,
 } from "../supabase/types";
 
 export async function getTournamentById(id: string): Promise<Tournament | null> {
@@ -214,6 +215,8 @@ export type ActivateTournamentInput = {
   games_per_match: number;
   total_rounds: number;
   formation: GroupFormation;
+  advances_per_group?: number | null;
+  has_bronze?: boolean;
 };
 
 export async function activateTournament(
@@ -351,4 +354,38 @@ export async function getGroupsByTournament(
     .order("sort_order");
   if (error) throw error;
   return (data ?? []) as TournamentGroup[];
+}
+
+export async function insertRoundRests(
+  rows: Omit<RoundRest, "id">[]
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await supabaseClient
+    .from("round_rests")
+    .insert(rows);
+  if (error) throw error;
+}
+
+export async function getRoundRests(
+  tournamentId: string
+): Promise<RoundRest[]> {
+  const { data, error } = await supabaseClient
+    .from("round_rests")
+    .select("*")
+    .eq("tournament_id", tournamentId)
+    .order("round_number");
+  if (error) throw error;
+  return (data ?? []) as RoundRest[];
+}
+
+export async function updateTournamentPlayoffSettings(
+  id: string,
+  advancesPerGroup: number | null,
+  hasBronze: boolean
+): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournaments")
+    .update({ advances_per_group: advancesPerGroup, has_bronze: hasBronze })
+    .eq("id", id);
+  if (error) throw error;
 }

@@ -43,7 +43,16 @@ export type Tournament = {
   archived_at: string | null;
   open_registration: boolean;
   max_teams: number | null;
+  advances_per_group: number | null;
+  has_bronze: boolean;
   created_at: string;
+};
+
+export type RoundRest = {
+  id: string;
+  tournament_id: string;
+  round_number: number;
+  team_id: string;
 };
 
 export type TournamentGroup = {

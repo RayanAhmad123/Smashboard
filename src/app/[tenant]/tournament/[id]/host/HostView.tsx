@@ -13,14 +13,23 @@ import type {
   Player,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
-import { markTeamPaid } from "@/lib/db/tournaments";
-import { computeStandings, teamName, stageLabel } from "@/lib/standings";
+import { markTeamPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
+import { computeStandings, teamName, stageLabel, shortTeamName } from "@/lib/standings";
 import { PaymentPanel, type PaymentTeamRow } from "@/components/PaymentPanel";
 import {
   badgeClassForMatch,
   buildGroupIndex,
   groupPaletteFor,
 } from "@/lib/group-colors";
+import {
+  generateFirstKORound,
+  generateNextKORound,
+  byeCount,
+  firstKOStage,
+  nextStage,
+  type GroupStanding,
+} from "@/lib/algorithms/knockout";
+import type { RoundRest } from "@/lib/supabase/types";
 
 type Loaded = {
   tournament: Tournament;
@@ -29,6 +38,7 @@ type Loaded = {
   matches: TournamentMatch[];
   players: Player[];
   courts: Court[];
+  rests: RoundRest[];
 };
 
 export function HostView({
@@ -85,9 +95,12 @@ export function HostView({
           )
         )
       );
-      const playersRes = playerIds.length
-        ? await supabaseClient.from("players").select("*").in("id", playerIds)
-        : { data: [], error: null };
+      const [playersRes, rests] = await Promise.all([
+        playerIds.length
+          ? supabaseClient.from("players").select("*").in("id", playerIds)
+          : Promise.resolve({ data: [], error: null }),
+        getRoundRests(tournamentId),
+      ]);
       if (playersRes.error) throw playersRes.error;
 
       setData({
@@ -97,6 +110,7 @@ export function HostView({
         matches: (matchesRes.data ?? []) as TournamentMatch[],
         players: (playersRes.data ?? []) as Player[],
         courts: (courtsRes.data ?? []) as Court[],
+        rests,
       });
     } catch (e) {
       setErr((e as Error).message);
@@ -139,7 +153,8 @@ function HostInner({
   busy: string | null;
   setBusy: (s: string | null) => void;
 }) {
-  const { tournament, groups, teams, matches, players, courts } = data;
+  const { tournament, groups, teams, matches, players, courts, rests } = data;
+  const accent = tenant.primary_color || "#10b981";
 
   const [rightTab, setRightTab] = useState<"tabeller" | "betalning">("tabeller");
   const [paidIds, setPaidIds] = useState<Set<string>>(
@@ -236,6 +251,65 @@ function HostInner({
     return decorated.map((d) => d.court);
   }, [courts, matchByCourt, groupIndexMap]);
 
+  // --- Playoff derived state ---
+  const groupMatches = useMemo(() => matches.filter((m) => m.stage === "group"), [matches]);
+  const koMatches = useMemo(() => matches.filter((m) => m.stage !== "group"), [matches]);
+  const allGroupDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === "completed");
+  const hasKO = koMatches.length > 0;
+  const advancesPerGroup = tournament.advances_per_group ?? 0;
+
+  type TournamentPhase = "group_active" | "ready_for_playoff" | "ko_active" | "done";
+  const tournamentPhase = useMemo((): TournamentPhase => {
+    if (!allGroupDone) return "group_active";
+    if (!hasKO && advancesPerGroup > 0) return "ready_for_playoff";
+    if (hasKO && koMatches.some((m) => m.status !== "completed")) return "ko_active";
+    return "done";
+  }, [allGroupDone, hasKO, advancesPerGroup, koMatches]);
+
+  // Within ko_active: find the current incomplete KO stage (ignoring bronze)
+  const activeKOStage = useMemo(() => {
+    const incomplete = koMatches.filter((m) => m.status !== "completed" && m.stage !== "bronze");
+    if (incomplete.length > 0) return incomplete[0].stage;
+    return null;
+  }, [koMatches]);
+
+  // The most recently completed KO stage (ignoring bronze)
+  const lastCompletedKOStage = useMemo(() => {
+    const complete = koMatches.filter((m) => m.status === "completed" && m.stage !== "bronze");
+    if (complete.length === 0) return null;
+    // Return the stage of the last completed non-bronze round
+    const stages = ["quarter_final", "semi_final", "final"] as const;
+    for (let i = stages.length - 1; i >= 0; i--) {
+      if (complete.some((m) => m.stage === stages[i])) return stages[i];
+    }
+    return null;
+  }, [koMatches]);
+
+  // Whether the current KO stage is fully done and there's a next stage to generate
+  const koRoundReadyToAdvance = useMemo(() => {
+    if (tournamentPhase !== "ko_active") return false;
+    if (activeKOStage !== null) return false; // still in progress
+    if (!lastCompletedKOStage) return false;
+    return nextStage(lastCompletedKOStage) !== null;
+  }, [tournamentPhase, activeKOStage, lastCompletedKOStage]);
+
+  // Group standings for playoff panel
+  const groupStandings = useMemo((): GroupStanding[] => {
+    if (advancesPerGroup === 0) return [];
+    return groups.map((g) => {
+      const groupTeams = teams.filter((t) => t.group_id === g.id);
+      const groupMatchesForGroup = groupMatches.filter((m) => m.group_id === g.id);
+      const standings = computeStandings(groupTeams, groupMatchesForGroup, playerMap).slice(0, advancesPerGroup);
+      return { groupId: g.id, groupName: g.name, standings };
+    });
+  }, [groups, teams, groupMatches, playerMap, advancesPerGroup]);
+
+  // Resting team for the current round (group phase)
+  const restingTeamIdsThisRound = useMemo(() => {
+    if (!currentRound) return [];
+    return rests.filter((r) => r.round_number === currentRound).map((r) => r.team_id);
+  }, [rests, currentRound]);
+
   async function saveScore(
     match: TournamentMatch,
     s1: number,
@@ -315,11 +389,37 @@ function HostInner({
         </div>
       </header>
 
+      {(tournamentPhase === "ready_for_playoff" || koRoundReadyToAdvance) && (
+        <PlayoffPanel
+          tournament={tournament}
+          groupStandings={groupStandings}
+          koMatches={koMatches}
+          courts={courts}
+          accent={accent}
+          lastCompletedKOStage={lastCompletedKOStage}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          onGenerated={reload}
+        />
+      )}
+
       <main className="px-5 py-4 grid lg:grid-cols-[1fr_300px] gap-5">
         <section>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2">
             Aktiva matcher
           </h2>
+          {restingTeamIdsThisRound.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {restingTeamIdsThisRound.map((tid) => {
+                const t = teamMap.get(tid);
+                return t ? (
+                  <div key={tid} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
+                    Vilar: {shortTeamName(t, playerMap)}
+                  </div>
+                ) : null;
+              })}
+            </div>
+          )}
           <div
             className={`grid gap-2 ${courts.length > 1 ? "lg:grid-cols-2" : "grid-cols-1"}`}
           >
@@ -491,6 +591,227 @@ function HostInner({
       </main>
     </div>
   );
+}
+
+// --- PlayoffPanel ---
+// Shown when: all group play done + no KO matches yet (ready_for_playoff)
+// OR: a KO round just finished and there's a next round to generate.
+
+function PlayoffPanel({
+  tournament,
+  groupStandings,
+  koMatches,
+  courts,
+  accent,
+  lastCompletedKOStage,
+  teamMap,
+  playerMap,
+  onGenerated,
+}: {
+  tournament: Tournament;
+  groupStandings: GroupStanding[];
+  koMatches: TournamentMatch[];
+  courts: Court[];
+  accent: string;
+  lastCompletedKOStage: string | null;
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  onGenerated: () => Promise<void>;
+}) {
+  const isFirstRound = koMatches.length === 0;
+  const advancesPerGroup = tournament.advances_per_group ?? 0;
+  const hasBronze = tournament.has_bronze;
+
+  const byes = byeCount(groupStandings);
+  const [byeGroupIds, setByeGroupIds] = useState<Set<string>>(new Set());
+  const [selectedCourts, setSelectedCourts] = useState<Set<string>>(new Set(courts.map((c) => c.id)));
+  const [generating, setGenerating] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const chosenCourts = courts.filter((c) => selectedCourts.has(c.id));
+
+  const canGenerate =
+    chosenCourts.length > 0 &&
+    byeGroupIds.size === byes;
+
+  const stageLabel = isFirstRound
+    ? firstKOStageLabel(groupStandings.reduce((s, g) => s + g.standings.length, 0))
+    : nextStageLabel(lastCompletedKOStage);
+
+  async function generate() {
+    if (!canGenerate) return;
+    setErr(null);
+    setGenerating(true);
+    try {
+      let newMatches;
+      if (isFirstRound) {
+        newMatches = generateFirstKORound(
+          groupStandings,
+          Array.from(byeGroupIds),
+          chosenCourts,
+          tournament.id,
+          hasBronze
+        );
+      } else {
+        const completedStageMatches = koMatches.filter(
+          (m) => m.stage === lastCompletedKOStage && m.status === "completed"
+        );
+        newMatches = generateNextKORound(
+          completedStageMatches,
+          chosenCourts,
+          tournament.id,
+          hasBronze
+        );
+      }
+      if (newMatches.length === 0) {
+        setErr("Inga matcher kunde genereras. Kontrollera inställningarna.");
+        return;
+      }
+      await insertMatches(newMatches);
+      await onGenerated();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-5 py-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
+          style={{ backgroundColor: accent }}
+        >
+          {stageLabel}
+        </span>
+        <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+          {isFirstRound ? "Starta slutspel" : `Generera ${stageLabel}`}
+        </h2>
+      </div>
+
+      {err && (
+        <div className="mb-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+          {err}
+        </div>
+      )}
+
+      {/* Group standings with advancing teams highlighted */}
+      {isFirstRound && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {groupStandings.map((g, gi) => {
+            const palette = groupPaletteFor(gi);
+            return (
+              <div key={g.groupId} className={`rounded-lg border overflow-hidden`}>
+                <div className={`px-3 py-1.5 text-xs font-semibold ${palette.bar}`}>
+                  {g.groupName} — vidare
+                </div>
+                <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {g.standings.map((s, i) => {
+                    const t = teamMap.get(s.team_id);
+                    return (
+                      <div key={s.team_id} className="px-3 py-1.5 flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-4">{i + 1}</span>
+                        <span className="text-xs font-medium truncate">{t ? shortTeamName(t, playerMap) : s.teamName}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bye selection */}
+      {isFirstRound && byes > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3">
+          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2">
+            {byes} frival till {nextStageLabel(firstKOStageLabel(groupStandings.reduce((s, g) => s + g.standings.length, 0)))} — välj vilka grupper:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {groupStandings.map((g) => {
+              const checked = byeGroupIds.has(g.groupId);
+              const disabled = !checked && byeGroupIds.size >= byes;
+              return (
+                <label key={g.groupId} className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer ${disabled ? "opacity-40" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      setByeGroupIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(g.groupId);
+                        else next.delete(g.groupId);
+                        return next;
+                      });
+                    }}
+                    className="rounded"
+                  />
+                  {g.groupName}
+                </label>
+              );
+            })}
+          </div>
+          {byeGroupIds.size < byes && (
+            <p className="text-[10px] text-amber-700 mt-1">Välj {byes - byeGroupIds.size} till</p>
+          )}
+        </div>
+      )}
+
+      {/* Court selection */}
+      <div className="mb-4">
+        <p className="text-xs font-medium text-zinc-500 mb-2">Banor för slutspelsrundan:</p>
+        <div className="flex flex-wrap gap-2">
+          {courts.map((c) => {
+            const checked = selectedCourts.has(c.id);
+            return (
+              <label key={c.id} className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    setSelectedCourts((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(c.id)) next.delete(c.id);
+                      else next.add(c.id);
+                      return next;
+                    });
+                  }}
+                  className="rounded"
+                />
+                {c.name}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        onClick={generate}
+        disabled={!canGenerate || generating}
+        className="px-5 py-2 rounded-md text-white text-sm font-semibold disabled:opacity-50 transition-opacity"
+        style={{ backgroundColor: accent }}
+      >
+        {generating ? "Genererar..." : `Generera ${stageLabel} →`}
+      </button>
+    </div>
+  );
+}
+
+function firstKOStageLabel(total: number): string {
+  if (total <= 2) return "Final";
+  if (total <= 4) return "Semifinal";
+  return "Kvartsfinal";
+}
+
+function nextStageLabel(current: string | null): string {
+  switch (current) {
+    case "quarter_final": return "Semifinal";
+    case "semi_final": return "Final";
+    default: return "Nästa runda";
+  }
 }
 
 function MatchCard({

@@ -60,6 +60,7 @@ export type TournamentTeam = {
   player1_id: string;
   player2_id: string | null;
   seed: number | null;
+  paid_at: string | null;
 };
 
 export type MatchStatus = "scheduled" | "in_progress" | "completed";

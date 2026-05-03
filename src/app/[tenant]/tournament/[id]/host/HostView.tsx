@@ -13,7 +13,9 @@ import type {
   Player,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
+import { markTeamPaid } from "@/lib/db/tournaments";
 import { computeStandings, teamName, stageLabel } from "@/lib/standings";
+import { PaymentPanel, type PaymentTeamRow } from "@/components/PaymentPanel";
 import {
   badgeClassForMatch,
   buildGroupIndex,
@@ -138,6 +140,17 @@ function HostInner({
   setBusy: (s: string | null) => void;
 }) {
   const { tournament, groups, teams, matches, players, courts } = data;
+
+  const [rightTab, setRightTab] = useState<"tabeller" | "betalning">("tabeller");
+  const [paidIds, setPaidIds] = useState<Set<string>>(
+    () => new Set(teams.filter((t) => t.paid_at).map((t) => t.id))
+  );
+
+  async function handleMarkPaid(teamId: string) {
+    await markTeamPaid(teamId);
+    setPaidIds((prev) => new Set([...prev, teamId]));
+  }
+
   const playerMap = useMemo(() => {
     const m = new Map<string, Player>();
     for (const p of players) m.set(p.id, p);
@@ -154,6 +167,16 @@ function HostInner({
     return m;
   }, [groups]);
   const groupIndexMap = useMemo(() => buildGroupIndex(groups), [groups]);
+
+  const paymentRows: PaymentTeamRow[] = useMemo(
+    () =>
+      teams.map((t) => ({
+        id: t.id,
+        displayName: teamName(t, playerMap),
+        paid: paidIds.has(t.id),
+      })),
+    [teams, playerMap, paidIds]
+  );
 
   const completedCount = useMemo(
     () => matches.filter((m) => m.status === "completed").length,
@@ -352,93 +375,118 @@ function HostInner({
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2 flex items-center">
-            <img src="/icons/icon-standings.svg" alt="" width={20} height={20} className="inline mr-1.5" />
-            Tabeller
-          </h2>
-          <div className="space-y-6">
-            {groups.map((g, gi) => {
-              const groupTeams = teams.filter((t) => t.group_id === g.id);
-              const groupMatches = matches.filter((m) => m.group_id === g.id);
-              const standings = computeStandings(
-                groupTeams,
-                groupMatches,
-                playerMap
-              );
-              const palette = groupPaletteFor(gi);
-              return (
-                <div
-                  key={g.id}
-                  className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
-                >
-                  <div
-                    className={`px-4 py-2 border-b font-medium text-sm ${palette.bar}`}
-                  >
-                    {g.name}
-                  </div>
-                  <table className="w-full text-xs">
-                    <thead className="text-zinc-500">
-                      <tr>
-                        <th className="px-2 py-2 w-8">#</th>
-                        <th className="text-left px-3 py-2 font-medium">Lag</th>
-                        <th className="px-2 py-2">
-                          <abbr
-                            title="Matcher spelade"
-                            className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
-                          >
-                            MP
-                          </abbr>
-                        </th>
-                        <th className="px-2 py-2">
-                          <abbr
-                            title="Vunna game"
-                            className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
-                          >
-                            GF
-                          </abbr>
-                        </th>
-                        <th className="px-2 py-2">
-                          <abbr
-                            title="Förlorade game"
-                            className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
-                          >
-                            GA
-                          </abbr>
-                        </th>
-                        <th className="px-2 py-2">
-                          <abbr
-                            title="Game-skillnad (vunna minus förlorade)"
-                            className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
-                          >
-                            GD
-                          </abbr>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {standings.map((s, i) => (
-                        <tr
-                          key={s.team_id}
-                          className="border-t border-zinc-100 dark:border-zinc-800"
-                        >
-                          <td className="px-2 py-2 text-center text-zinc-500">
-                            {i + 1}
-                          </td>
-                          <td className="px-3 py-2">{s.teamName}</td>
-                          <td className="px-2 py-2 text-center">{s.mp}</td>
-                          <td className="px-2 py-2 text-center">{s.gf}</td>
-                          <td className="px-2 py-2 text-center">{s.ga}</td>
-                          <td className="px-2 py-2 text-center font-semibold">
-                            {s.gd > 0 ? `+${s.gd}` : s.gd}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-0 border-b border-zinc-200 dark:border-zinc-800 mb-3">
+            {(["tabeller", "betalning"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setRightTab(t)}
+                className={`px-3 py-1.5 text-xs font-semibold border-b-2 -mb-px transition-colors capitalize ${
+                  rightTab === t
+                    ? "text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500 border-transparent hover:text-zinc-700 dark:hover:text-zinc-300"
+                }`}
+                style={
+                  rightTab === t
+                    ? { borderColor: tenant.primary_color || "#10b981" }
+                    : undefined
+                }
+              >
+                {t === "tabeller" ? "Tabeller" : "Betalning"}
+              </button>
+            ))}
           </div>
+
+          {rightTab === "tabeller" ? (
+            <div className="space-y-6">
+              {groups.map((g, gi) => {
+                const groupTeams = teams.filter((t) => t.group_id === g.id);
+                const groupMatches = matches.filter((m) => m.group_id === g.id);
+                const standings = computeStandings(
+                  groupTeams,
+                  groupMatches,
+                  playerMap
+                );
+                const palette = groupPaletteFor(gi);
+                return (
+                  <div
+                    key={g.id}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+                  >
+                    <div
+                      className={`px-4 py-2 border-b font-medium text-sm ${palette.bar}`}
+                    >
+                      {g.name}
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead className="text-zinc-500">
+                        <tr>
+                          <th className="px-2 py-2 w-8">#</th>
+                          <th className="text-left px-3 py-2 font-medium">Lag</th>
+                          <th className="px-2 py-2">
+                            <abbr
+                              title="Matcher spelade"
+                              className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
+                            >
+                              MP
+                            </abbr>
+                          </th>
+                          <th className="px-2 py-2">
+                            <abbr
+                              title="Vunna game"
+                              className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
+                            >
+                              GF
+                            </abbr>
+                          </th>
+                          <th className="px-2 py-2">
+                            <abbr
+                              title="Förlorade game"
+                              className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
+                            >
+                              GA
+                            </abbr>
+                          </th>
+                          <th className="px-2 py-2">
+                            <abbr
+                              title="Game-skillnad (vunna minus förlorade)"
+                              className="cursor-help no-underline decoration-dotted underline-offset-2 hover:underline"
+                            >
+                              GD
+                            </abbr>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {standings.map((s, i) => (
+                          <tr
+                            key={s.team_id}
+                            className="border-t border-zinc-100 dark:border-zinc-800"
+                          >
+                            <td className="px-2 py-2 text-center text-zinc-500">
+                              {i + 1}
+                            </td>
+                            <td className="px-3 py-2">{s.teamName}</td>
+                            <td className="px-2 py-2 text-center">{s.mp}</td>
+                            <td className="px-2 py-2 text-center">{s.gf}</td>
+                            <td className="px-2 py-2 text-center">{s.ga}</td>
+                            <td className="px-2 py-2 text-center font-semibold">
+                              {s.gd > 0 ? `+${s.gd}` : s.gd}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <PaymentPanel
+              teams={paymentRows}
+              accent={tenant.primary_color || "#10b981"}
+              onMarkPaid={handleMarkPaid}
+            />
+          )}
         </section>
       </main>
     </div>

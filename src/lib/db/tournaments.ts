@@ -333,6 +333,14 @@ export async function getPlannedStats(
   return [...map.values()];
 }
 
+export async function markTeamPaid(teamId: string): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournament_teams")
+    .update({ paid_at: new Date().toISOString() })
+    .eq("id", teamId);
+  if (error) throw error;
+}
+
 export async function getGroupsByTournament(
   tournamentId: string
 ): Promise<TournamentGroup[]> {

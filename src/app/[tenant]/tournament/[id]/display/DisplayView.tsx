@@ -350,24 +350,24 @@ function RestingChip({
   accent: string;
 }) {
   return (
-    <div className="flex items-center gap-[1vw] rounded-2xl overflow-hidden"
+    <div className="flex items-center gap-[1vw] rounded-xl overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, ${accent}22 0%, ${accent}10 100%)`,
-        border: `2px solid ${accent}44`,
-        padding: "clamp(0.5rem, 0.8vh, 1rem) clamp(1rem, 1.5vw, 2rem)",
+        background: `linear-gradient(135deg, ${accent}18 0%, ${accent}08 100%)`,
+        border: `1.5px solid ${accent}33`,
+        padding: "clamp(0.3rem, 0.5vh, 0.6rem) clamp(0.6rem, 1vw, 1.2rem)",
       }}
     >
       <span
-        className="shrink-0 font-black uppercase tracking-widest"
-        style={{ fontSize: "clamp(0.7rem, 1vw, 1.2rem)", color: accent }}
+        className="shrink-0 font-bold uppercase tracking-wider"
+        style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)", color: accent }}
       >
-        Vilar denna runda
+        Vilar
       </span>
       <span
         className="inline-block w-px bg-current opacity-20 self-stretch"
         style={{ color: accent }}
       />
-      <div className="flex flex-wrap gap-[1.5vw]">
+      <div className="flex flex-wrap gap-x-[1.5vw] gap-y-[0.4vh]">
         {teamIds.map((tid) => {
           const t = teamMap.get(tid);
           if (!t) return null;
@@ -376,10 +376,10 @@ function RestingChip({
           return (
             <span
               key={tid}
-              className="font-black text-zinc-800"
-              style={{ fontSize: "clamp(1rem, 1.8vw, 2.2rem)" }}
+              className="font-semibold text-zinc-700"
+              style={{ fontSize: "clamp(0.65rem, 0.9vw, 1.1rem)" }}
             >
-              {p1?.name ?? "?"}{p2 ? ` & ${p2.name}` : ""}
+              {shortName(p1)}{p2 ? ` & ${shortName(p2)}` : ""}
             </span>
           );
         })}
@@ -1118,19 +1118,21 @@ function TeamBlock({
   return (
     <div className={`min-w-0 ${align === "right" ? "text-right" : "text-left"}`}>
       <div
-        className="font-bold leading-tight truncate text-white"
+        className="font-bold leading-tight text-white"
         style={{
-          fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)",
+          fontSize: "clamp(0.7rem, 1.05vw, 1.4rem)",
           textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+          wordBreak: "break-word",
         }}
       >
         {shortName(p1)}
       </div>
       <div
-        className="font-bold leading-tight truncate text-white"
+        className="font-bold leading-tight text-white"
         style={{
-          fontSize: "clamp(0.8rem, 1.3vw, 1.7rem)",
+          fontSize: "clamp(0.7rem, 1.05vw, 1.4rem)",
           textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+          wordBreak: "break-word",
         }}
       >
         {shortName(p2)}
@@ -1224,7 +1226,7 @@ function StandingsColumn({
         <div
           className="font-black tracking-tight uppercase"
           style={{
-            fontSize: "clamp(0.7rem, 0.95vw, 1.05rem)",
+            fontSize: "clamp(0.55rem, 0.75vw, 0.88rem)",
             color: accent,
             letterSpacing: "0.1em",
           }}
@@ -1233,7 +1235,7 @@ function StandingsColumn({
         </div>
         <div
           className="text-zinc-500 uppercase tracking-widest font-semibold tabular-nums"
-          style={{ fontSize: "clamp(0.5rem, 0.65vw, 0.8rem)" }}
+          style={{ fontSize: "clamp(0.45rem, 0.55vw, 0.7rem)" }}
         >
           # · LAG · GD
         </div>
@@ -1251,13 +1253,13 @@ function StandingsColumn({
               className="flex-1 min-h-0 flex flex-col overflow-hidden"
             >
               <div
-                className={`px-[0.8vw] py-[0.4vh] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
-                style={{ fontSize: "clamp(0.75rem, 1vw, 1.15rem)" }}
+                className={`px-[0.8vw] py-[0.3vh] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
+                style={{ fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)" }}
               >
                 <span>{g.name}</span>
                 <span
                   className="opacity-60 tabular-nums font-semibold"
-                  style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
+                  style={{ fontSize: "clamp(0.5rem, 0.6vw, 0.75rem)" }}
                 >
                   {standings.length}
                 </span>
@@ -1268,8 +1270,8 @@ function StandingsColumn({
                   return (
                     <li
                       key={s.team_id}
-                      className="px-[0.8vw] py-[0.45vh] flex items-center gap-2 border-t border-zinc-100"
-                      style={{ fontSize: "clamp(0.7rem, 0.95vw, 1.1rem)" }}
+                      className="px-[0.8vw] py-[0.3vh] flex items-center gap-2 border-t border-zinc-100"
+                      style={{ fontSize: "clamp(0.6rem, 0.78vw, 0.92rem)" }}
                     >
                       <span
                         className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.6em] h-[1.6em] font-black tabular-nums"

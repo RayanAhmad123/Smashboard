@@ -8,10 +8,11 @@ import {
   setTournamentArchived,
 } from "@/lib/db/tournaments";
 
-type Tab = "active" | "draft" | "completed" | "archived";
+type Tab = "active" | "planned" | "draft" | "completed" | "archived";
 
 const TAB_LABEL: Record<Tab, string> = {
   active: "Aktiva",
+  planned: "Planerade",
   draft: "Utkast",
   completed: "Avslutade",
   archived: "Arkiverade",
@@ -41,6 +42,7 @@ export function DashboardClient({
   const counts = useMemo(() => {
     const c: Record<Tab, number> = {
       active: 0,
+      planned: 0,
       draft: 0,
       completed: 0,
       archived: 0,
@@ -48,6 +50,7 @@ export function DashboardClient({
     for (const t of tournaments) {
       if (t.archived_at) c.archived++;
       else if (t.status === "active") c.active++;
+      else if (t.status === "draft" && t.open_registration) c.planned++;
       else if (t.status === "draft") c.draft++;
       else if (t.status === "completed") c.completed++;
     }
@@ -58,6 +61,8 @@ export function DashboardClient({
     return tournaments.filter((t) => {
       if (tab === "archived") return !!t.archived_at;
       if (t.archived_at) return false;
+      if (tab === "planned") return t.status === "draft" && t.open_registration;
+      if (tab === "draft") return t.status === "draft" && !t.open_registration;
       return t.status === tab;
     });
   }, [tournaments, tab]);
@@ -223,7 +228,15 @@ function TournamentCard({
             <span>{FORMAT_LABEL[tournament.format]}</span>
             <span className="text-zinc-300">·</span>
             {isDraft ? (
-              <span>{formatScheduled(tournament.scheduled_at)}</span>
+              <>
+                <span>{formatScheduled(tournament.scheduled_at)}</span>
+                {tournament.open_registration && tournament.max_teams && (
+                  <>
+                    <span className="text-zinc-300">·</span>
+                    <span>max {tournament.max_teams} lag</span>
+                  </>
+                )}
+              </>
             ) : (
               <>
                 <span>Mål {tournament.games_per_match}</span>
@@ -339,6 +352,13 @@ function StatusBadge({
       </span>
     );
   }
+  if (tournament.status === "draft" && tournament.open_registration) {
+    return (
+      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-sky-50 text-sky-700 shrink-0">
+        Bokning öppen
+      </span>
+    );
+  }
   if (tournament.status === "draft") {
     return (
       <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-amber-50 text-amber-700 shrink-0">
@@ -364,6 +384,7 @@ function EmptyState({
 }) {
   const messages: Record<Tab, string> = {
     active: "Inga aktiva sessioner just nu.",
+    planned: "Inga planerade sessioner med öppen bokning.",
     draft: "Inga utkast.",
     completed: "Inga avslutade sessioner än.",
     archived: "Arkivet är tomt.",

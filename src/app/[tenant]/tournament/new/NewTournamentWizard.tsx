@@ -27,6 +27,8 @@ export function NewTournamentWizard({ tenant }: { tenant: Tenant }) {
   const [name, setName] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("gruppspel");
   const [scheduledLocal, setScheduledLocal] = useState(defaultScheduledAt());
+  const [openRegistration, setOpenRegistration] = useState(false);
+  const [maxTeams, setMaxTeams] = useState<number>(8);
 
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -43,6 +45,8 @@ export function NewTournamentWizard({ tenant }: { tenant: Tenant }) {
         name: name.trim(),
         format,
         scheduled_at: scheduledIso,
+        open_registration: openRegistration,
+        max_teams: openRegistration ? maxTeams : null,
       });
       router.push(`/${tenant.slug}/tournament/${tournament.id}/plan`);
     } catch (e) {
@@ -107,6 +111,51 @@ export function NewTournamentWizard({ tenant }: { tenant: Tenant }) {
               value={scheduledLocal}
               onChange={(e) => setScheduledLocal(e.target.value)}
             />
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Öppna för bokning</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Spelare kan anmäla sig via en bokningslänk
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={openRegistration}
+                onClick={() => setOpenRegistration((v) => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                  openRegistration ? "" : "bg-zinc-200"
+                }`}
+                style={openRegistration ? { backgroundColor: accent } : undefined}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                    openRegistration ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {openRegistration && (
+              <div className="mt-4 pt-4 border-t border-zinc-100">
+                <label className="text-sm font-medium block mb-1">
+                  Max antal lag
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={64}
+                  className="w-32 px-3 py-2 rounded-md border border-zinc-300 bg-white text-sm"
+                  value={maxTeams}
+                  onChange={(e) =>
+                    setMaxTeams(Math.max(2, parseInt(e.target.value) || 2))
+                  }
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end pt-3">

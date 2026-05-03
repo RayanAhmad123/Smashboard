@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentFormat } from "@/lib/supabase/types";
+import type { PlannedSessionStats } from "@/lib/db/tournaments";
 import {
   deleteTournament,
   setTournamentArchived,
@@ -28,9 +29,11 @@ const FORMAT_LABEL: Record<TournamentFormat, string> = {
 export function DashboardClient({
   tenant,
   initialTournaments,
+  initialPlannedStats,
 }: {
   tenant: Tenant;
   initialTournaments: Tournament[];
+  initialPlannedStats: PlannedSessionStats[];
 }) {
   const [tournaments, setTournaments] = useState(initialTournaments);
   const [tab, setTab] = useState<Tab>("active");
@@ -38,6 +41,12 @@ export function DashboardClient({
   const [err, setErr] = useState<string | null>(null);
 
   const accent = tenant.primary_color || "#10b981";
+
+  const statsMap = useMemo(() => {
+    const m = new Map<string, PlannedSessionStats>();
+    for (const s of initialPlannedStats) m.set(s.tournament_id, s);
+    return m;
+  }, [initialPlannedStats]);
 
   const counts = useMemo(() => {
     const c: Record<Tab, number> = {
@@ -169,6 +178,7 @@ export function DashboardClient({
                 tenantSlug={tenant.slug}
                 accent={accent}
                 busy={busy === t.id}
+                plannedStats={statsMap.get(t.id)}
                 onArchive={(v) => archive(t, v)}
                 onDelete={() => destroy(t)}
               />
@@ -197,6 +207,7 @@ function TournamentCard({
   tenantSlug,
   accent,
   busy,
+  plannedStats,
   onArchive,
   onDelete,
 }: {
@@ -204,11 +215,13 @@ function TournamentCard({
   tenantSlug: string;
   accent: string;
   busy: boolean;
+  plannedStats?: PlannedSessionStats;
   onArchive: (archived: boolean) => void;
   onDelete: () => void;
 }) {
   const archived = !!tournament.archived_at;
   const isDraft = tournament.status === "draft" && !archived;
+  const isPlanned = isDraft && tournament.open_registration;
   const created = new Date(tournament.created_at).toLocaleDateString("sv-SE");
   const progress = tournament.total_rounds
     ? Math.round(
@@ -217,6 +230,11 @@ function TournamentCard({
           100
       )
     : 0;
+
+  const spotsTotal = tournament.max_teams ?? 0;
+  const spotsTaken = plannedStats?.team_count ?? 0;
+  const spotsFill = spotsTotal > 0 ? Math.min(spotsTaken / spotsTotal, 1) : 0;
+
   return (
     <li className="rounded-xl border border-zinc-200 bg-white p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
@@ -228,15 +246,7 @@ function TournamentCard({
             <span>{FORMAT_LABEL[tournament.format]}</span>
             <span className="text-zinc-300">·</span>
             {isDraft ? (
-              <>
-                <span>{formatScheduled(tournament.scheduled_at)}</span>
-                {tournament.open_registration && tournament.max_teams && (
-                  <>
-                    <span className="text-zinc-300">·</span>
-                    <span>max {tournament.max_teams} lag</span>
-                  </>
-                )}
-              </>
+              <span>{formatScheduled(tournament.scheduled_at)}</span>
             ) : (
               <>
                 <span>Mål {tournament.games_per_match}</span>
@@ -248,6 +258,37 @@ function TournamentCard({
         </div>
         <StatusBadge tournament={tournament} accent={accent} />
       </div>
+
+      {isPlanned && plannedStats && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+            <span className="font-medium text-zinc-700">
+              {spotsTaken} / {spotsTotal} lag bokade
+            </span>
+            <span className="tabular-nums">{Math.round(spotsFill * 100)}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${spotsFill * 100}%`, backgroundColor: accent }}
+            />
+          </div>
+          <div className="flex items-center gap-3 pt-0.5">
+            {plannedStats.pending_count > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                {plannedStats.pending_count} väntelista
+              </span>
+            )}
+            {plannedStats.solo_count > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
+                {plannedStats.solo_count} söker partner
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {!isDraft && (
         <div>

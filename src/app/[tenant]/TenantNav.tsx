@@ -15,7 +15,12 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
   if (pathname?.includes("/tournament/") && pathname.endsWith("/display")) {
     return null;
   }
-  if (pathname === `/${slug}/play` || pathname?.startsWith(`/${slug}/play/`)) {
+  if (
+    pathname === `/${slug}/play` ||
+    pathname?.startsWith(`/${slug}/play/`) ||
+    pathname === "/play" ||
+    pathname?.startsWith("/play/")
+  ) {
     return null;
   }
   const accent = primaryColor || "#10b981";

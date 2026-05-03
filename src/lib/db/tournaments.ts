@@ -113,6 +113,8 @@ export type CreateDraftInput = {
   name: string;
   format: TournamentFormat;
   scheduled_at: string | null;
+  open_registration?: boolean;
+  max_teams?: number | null;
 };
 
 export async function createDraftTournament(
@@ -125,6 +127,8 @@ export async function createDraftTournament(
       name: input.name,
       format: input.format,
       scheduled_at: input.scheduled_at,
+      open_registration: input.open_registration ?? false,
+      max_teams: input.open_registration ? (input.max_teams ?? null) : null,
       status: "draft",
       formation: "random",
       num_groups: 0,

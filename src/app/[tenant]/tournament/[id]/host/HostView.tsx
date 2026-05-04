@@ -122,6 +122,27 @@ export function HostView({
     load();
   }, [load]);
 
+  // Realtime: re-load whenever any match in this tournament changes so locked
+  // cards unlock immediately when a blocking match is scored.
+  useEffect(() => {
+    const channel = supabaseClient
+      .channel(`host:${tournamentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tournament_matches",
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        () => load()
+      )
+      .subscribe();
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, [tournamentId, load]);
+
   if (err)
     return (
       <div className="p-8 text-red-600">
@@ -287,6 +308,47 @@ function HostInner({
   const groupMatches = useMemo(() => matches.filter((m) => m.stage === "group"), [matches]);
   const koMatches = useMemo(() => matches.filter((m) => m.stage !== "group"), [matches]);
   const allGroupDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === "completed");
+
+  // For each court whose current-round match is done, look ahead to the next
+  // round match on that same court (group phase only).
+  const nextMatchByCourt = useMemo(() => {
+    const map = new Map<string, TournamentMatch>();
+    if (currentRound === null) return map;
+    const isKOPhase = koMatches.some((m) => m.status !== "completed");
+    if (isKOPhase) return map;
+    for (const court of tournamentCourts) {
+      const cur = matchByCourt.get(court.id);
+      if (!cur || cur.status !== "completed") continue;
+      const next = matches
+        .filter((m) => m.court_id === court.id && m.round_number > currentRound)
+        .sort((a, b) => a.round_number - b.round_number)[0];
+      if (next && next.status !== "completed") map.set(court.id, next);
+    }
+    return map;
+  }, [currentRound, koMatches, tournamentCourts, matchByCourt, matches]);
+
+  // For each next-round match, collect the teams that are still playing in the
+  // current round (blocking it from opening).
+  const blockedBy = useMemo(() => {
+    const map = new Map<string, TournamentTeam[]>();
+    for (const [courtId, next] of nextMatchByCourt.entries()) {
+      const blocking: TournamentTeam[] = [];
+      for (const teamId of [next.team1_id, next.team2_id]) {
+        const stillPlaying = matches.some(
+          (m) =>
+            m.round_number === currentRound &&
+            m.status !== "completed" &&
+            (m.team1_id === teamId || m.team2_id === teamId)
+        );
+        if (stillPlaying) {
+          const t = teamMap.get(teamId);
+          if (t) blocking.push(t);
+        }
+      }
+      if (blocking.length > 0) map.set(courtId, blocking);
+    }
+    return map;
+  }, [nextMatchByCourt, matches, currentRound, teamMap]);
   const hasKO = koMatches.length > 0;
   const advancesPerGroup = tournament.advances_per_group ?? 0;
 
@@ -480,6 +542,40 @@ function HostInner({
                 );
               }
               if (m.status === "completed") {
+                const next = nextMatchByCourt.get(c.id);
+                if (next) {
+                  const blocking = blockedBy.get(c.id);
+                  if (blocking && blocking.length > 0) {
+                    return (
+                      <LockedCard
+                        key={next.id}
+                        match={next}
+                        team1={teamMap.get(next.team1_id)!}
+                        team2={teamMap.get(next.team2_id)!}
+                        playerMap={playerMap}
+                        courtName={c.name}
+                        stage={stageLabel(next, groupMap)}
+                        badgeClass={badgeClassForMatch(next, groupIndexMap)}
+                        blockingTeams={blocking}
+                      />
+                    );
+                  }
+                  return (
+                    <MatchCard
+                      key={next.id}
+                      match={next}
+                      team1={teamMap.get(next.team1_id)!}
+                      team2={teamMap.get(next.team2_id)!}
+                      playerMap={playerMap}
+                      courtName={c.name}
+                      stage={stageLabel(next, groupMap)}
+                      badgeClass={badgeClassForMatch(next, groupIndexMap)}
+                      onSave={(s1, s2) => saveScore(next, s1, s2)}
+                      busy={busy === next.id}
+                      gamesPerMatch={tournament.games_per_match}
+                    />
+                  );
+                }
                 return (
                   <WaitingCard
                     key={m.id}
@@ -1136,6 +1232,53 @@ function WaitingCard({
         <div className="flex-1 min-w-0 text-left text-sm font-medium truncate">
           {team2Label}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LockedCard({
+  match,
+  team1,
+  team2,
+  playerMap,
+  courtName,
+  stage,
+  badgeClass,
+  blockingTeams,
+}: {
+  match: TournamentMatch;
+  team1: TournamentTeam;
+  team2: TournamentTeam;
+  playerMap: Map<string, Player>;
+  courtName: string;
+  stage: string;
+  badgeClass: string;
+  blockingTeams: TournamentTeam[];
+}) {
+  const team1Label = shortTeamName(team1, playerMap);
+  const team2Label = shortTeamName(team2, playerMap);
+  const waitingFor = blockingTeams.map((t) => shortTeamName(t, playerMap)).join(" & ");
+  return (
+    <div className="rounded-lg border border-amber-200 dark:border-amber-800/60 bg-white dark:bg-zinc-900 p-2.5">
+      <div className="flex justify-between items-center text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">
+        <span className="font-semibold">{courtName}</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`px-1.5 py-px rounded font-semibold ${badgeClass}`}>{stage}</span>
+          <span className="font-semibold text-amber-600">Nästa</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 h-9">
+        <div className="flex-1 min-w-0 flex items-center justify-end text-right text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded text-zinc-400">
+          <span className="truncate">{team1Label}</span>
+        </div>
+        <span className="shrink-0 text-zinc-300 dark:text-zinc-600 font-bold text-sm px-1">vs</span>
+        <div className="flex-1 min-w-0 flex items-center justify-start text-left text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded text-zinc-400">
+          <span className="truncate">{team2Label}</span>
+        </div>
+      </div>
+      <div className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-400 text-center font-medium">
+        Väntar på: {waitingFor}
       </div>
     </div>
   );

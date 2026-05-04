@@ -718,13 +718,12 @@ function CourtCard({
   return (
     <div
       className={`relative overflow-hidden flex flex-col rounded-2xl transition-opacity ${idle ? "opacity-40 saturate-50" : ""}`}
-      style={
-        live
-          ? {
-              boxShadow: `inset 0 0 0 2px ${accent}, 0 0 28px -10px ${accent}`,
-            }
-          : undefined
-      }
+      style={{
+        containerType: "inline-size",
+        ...(live
+          ? { boxShadow: `inset 0 0 0 2px ${accent}, 0 0 28px -10px ${accent}` }
+          : {}),
+      }}
     >
       {/* top bar */}
       <div className="relative px-[1vw] pt-[0.7vh] pb-[0.4vh] flex items-center justify-between gap-2">
@@ -734,7 +733,7 @@ function CourtCard({
             style={{
               backgroundColor: `${accent}1f`,
               color: accent,
-              fontSize: "clamp(0.65rem, 0.95vw, 1.15rem)",
+              fontSize: "clamp(0.65rem, 3cqi, 2rem)",
             }}
           >
             {court.name}
@@ -765,14 +764,14 @@ function CourtCard({
           groupBadge ? (
             <div
               className={`font-bold uppercase tracking-wider px-2 py-0.5 rounded ${groupBadge}`}
-              style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
+              style={{ fontSize: "clamp(0.55rem, 2.5cqi, 1.6rem)" }}
             >
               {stage}
             </div>
           ) : (
             <div
               className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
-              style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.95rem)" }}
+              style={{ fontSize: "clamp(0.55rem, 2.5cqi, 1.6rem)" }}
             >
               {isFinal && <span className="mr-1">★</span>}
               {stage}
@@ -831,7 +830,7 @@ function TeamBlock({
       <div
         className="font-bold leading-tight text-white"
         style={{
-          fontSize: "clamp(0.7rem, 1.05vw, 1.4rem)",
+          fontSize: "clamp(0.7rem, 7cqi, 3rem)",
           textShadow: "0 1px 3px rgba(0,0,0,0.5)",
           wordBreak: "break-word",
         }}
@@ -841,7 +840,7 @@ function TeamBlock({
       <div
         className="font-bold leading-tight text-white"
         style={{
-          fontSize: "clamp(0.7rem, 1.05vw, 1.4rem)",
+          fontSize: "clamp(0.7rem, 7cqi, 3rem)",
           textShadow: "0 1px 3px rgba(0,0,0,0.5)",
           wordBreak: "break-word",
         }}

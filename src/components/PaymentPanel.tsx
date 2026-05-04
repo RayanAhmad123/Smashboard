@@ -101,18 +101,18 @@ export function PaymentPanel({
                 <button
                   onClick={() => handle(row, false)}
                   disabled={busy === row.key}
-                  className="shrink-0 px-3 py-1 rounded text-xs font-semibold text-zinc-600 border border-zinc-300 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+                  className="shrink-0 px-3 py-1 rounded text-xs font-semibold text-white disabled:opacity-50 transition-opacity"
+                  style={{ backgroundColor: accent }}
                 >
-                  {busy === row.key ? "…" : "Ångra"}
+                  {busy === row.key ? "…" : "Betald ✓"}
                 </button>
               ) : (
                 <button
                   onClick={() => handle(row, true)}
                   disabled={busy === row.key}
-                  className="shrink-0 px-3 py-1 rounded text-xs font-semibold text-white disabled:opacity-50 transition-opacity"
-                  style={{ backgroundColor: accent }}
+                  className="shrink-0 px-3 py-1 rounded text-xs font-semibold text-zinc-600 border border-zinc-300 hover:bg-zinc-100 disabled:opacity-50 transition-colors"
                 >
-                  {busy === row.key ? "…" : "Betald ✓"}
+                  {busy === row.key ? "…" : "Markera betald"}
                 </button>
               )}
             </li>

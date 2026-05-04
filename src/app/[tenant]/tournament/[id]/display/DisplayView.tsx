@@ -445,6 +445,8 @@ export function DisplayView({
         tournament={data.tournament}
         tenant={tenant}
         timeLabel={timeLabel}
+        hasKO={computed.hasKO}
+        tournamentDone={computed.tournamentDone}
       />
 
       <FullscreenButton accent={accent} />
@@ -1422,10 +1424,14 @@ function Footer({
   tournament,
   tenant,
   timeLabel,
+  hasKO,
+  tournamentDone,
 }: {
   tournament: Tournament;
   tenant: Tenant;
   timeLabel: string;
+  hasKO: boolean;
+  tournamentDone: boolean;
 }) {
   const [playUrl, setPlayUrl] = useState<string | null>(null);
 
@@ -1442,7 +1448,11 @@ function Footer({
         <span className="text-zinc-700">{tenant.name}</span>
         <span className="text-zinc-300">·</span>
         <span>
-          Runda {tournament.current_round} av {tournament.total_rounds || "–"}
+          {tournamentDone || tournament.status === "completed"
+            ? "Avslutad"
+            : hasKO
+              ? "Slutspel"
+              : `Runda ${tournament.current_round} av ${tournament.total_rounds || "–"}`}
         </span>
         <span className="text-zinc-300">·</span>
         <span className="tabular-nums">Uppdaterad {timeLabel}</span>

@@ -703,9 +703,11 @@ export function StartView({
                     {numGroups > 1 && (
                       <select
                         value={g}
-                        onChange={(e) =>
-                          setCourtGroup(c.id, parseInt(e.target.value, 10))
-                        }
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setCourtGroup(c.id, parseInt(e.target.value, 10));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                         disabled={!checked}
                         className="px-2 py-1 rounded-md border border-zinc-300 bg-white text-xs disabled:bg-zinc-50 disabled:text-zinc-400"
                       >

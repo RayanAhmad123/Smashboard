@@ -618,6 +618,7 @@ function HostInner({
   const [completeErr, setCompleteErr] = useState<string | null>(null);
 
   async function handleComplete(): Promise<void> {
+    if (!confirm("Avsluta sessionen? Alla matcher är klara och sessionen flyttas till Avslutade.")) return;
     setCompleting(true);
     setCompleteErr(null);
     try {

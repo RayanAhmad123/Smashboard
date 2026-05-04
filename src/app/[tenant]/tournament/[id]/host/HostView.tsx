@@ -1265,20 +1265,25 @@ function LockedCard({
         <span className="font-semibold">{courtName}</span>
         <div className="flex items-center gap-1.5">
           <span className={`px-1.5 py-px rounded font-semibold ${badgeClass}`}>{stage}</span>
-          <span className="font-semibold text-amber-600">Nästa</span>
+          <span className="px-1.5 py-px rounded font-semibold bg-amber-100 text-amber-700">Nästa</span>
         </div>
       </div>
-      <div className="flex items-center gap-2 h-9">
-        <div className="flex-1 min-w-0 flex items-center justify-end text-right text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded text-zinc-400">
+      <div className="flex items-stretch gap-2 opacity-50">
+        <div className="flex-1 min-w-0 flex items-center justify-end text-right text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded">
           <span className="truncate">{team1Label}</span>
         </div>
-        <span className="shrink-0 text-zinc-300 dark:text-zinc-600 font-bold text-sm px-1">vs</span>
-        <div className="flex-1 min-w-0 flex items-center justify-start text-left text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded text-zinc-400">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="w-12 h-9 rounded border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 flex items-center justify-center text-zinc-300 text-lg font-bold">–</div>
+          <span className="text-zinc-400 text-sm">–</span>
+          <div className="w-12 h-9 rounded border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 flex items-center justify-center text-zinc-300 text-lg font-bold">–</div>
+        </div>
+        <div className="flex-1 min-w-0 flex items-center justify-start text-left text-sm font-medium px-2 bg-zinc-50 dark:bg-zinc-800/40 rounded">
           <span className="truncate">{team2Label}</span>
         </div>
       </div>
-      <div className="mt-1.5 text-[10px] text-amber-700 dark:text-amber-400 text-center font-medium">
-        Väntar på: {waitingFor}
+      <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+        <span>Väntar på:</span>
+        <span className="font-semibold">{waitingFor}</span>
       </div>
     </div>
   );

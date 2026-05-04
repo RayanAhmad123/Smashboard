@@ -831,6 +831,7 @@ function CourtCard({
   const live = match?.status === "in_progress";
   const isFinal = match?.stage === "final";
   const idle = !match;
+  const locked = !!blockingTeams?.length;
   const groupBadge = match ? groupBadgeOrNull(match, groupIndexMap) : null;
 
   return (
@@ -877,6 +878,14 @@ function CourtCard({
               Klar
             </span>
           )}
+          {locked && (
+            <span
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 font-bold uppercase tracking-widest bg-amber-100 text-amber-700"
+              style={{ fontSize: "clamp(0.45rem, 0.6vw, 0.75rem)" }}
+            >
+              Nästa
+            </span>
+          )}
         </div>
         {stage && (
           groupBadge ? (
@@ -899,7 +908,7 @@ function CourtCard({
       </div>
 
       {/* matchup — court SVG sits behind only this section so it never touches header/footer text */}
-      <div className="relative flex-1 min-h-0 px-[0.4vw] pb-[0.4vh] flex items-center">
+      <div className={`relative flex-1 min-h-0 px-[0.4vw] pb-[0.4vh] flex items-center transition-opacity ${locked ? "opacity-40" : ""}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/icons/court-topdown.svg"

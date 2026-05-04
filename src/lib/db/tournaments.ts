@@ -42,6 +42,14 @@ export async function getTournamentsByTenant(tenantId: string): Promise<Tourname
   return (data ?? []) as Tournament[];
 }
 
+export async function completeTournament(id: string): Promise<void> {
+  const { error } = await supabaseClient
+    .from("tournaments")
+    .update({ status: "completed" })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function setTournamentArchived(
   id: string,
   archived: boolean

@@ -14,7 +14,7 @@ import type {
   MatchStage,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
-import { setPlayerPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
+import { setPlayerPaid, insertMatches, getRoundRests, completeTournament } from "@/lib/db/tournaments";
 import { computeStandings, teamName, stageLabel, shortTeamName } from "@/lib/standings";
 import { PaymentPanel, type PaymentPlayerRow } from "@/components/PaymentPanel";
 import {
@@ -401,8 +401,9 @@ function HostInner({
     if (!allGroupDone) return "group_active";
     if (!hasKO && advancesPerGroup > 0) return "ready_for_playoff";
     if (hasKO) {
-      const finalDone = koMatches.some((m) => m.stage === "final" && m.status === "completed");
-      return finalDone ? "done" : "ko_active";
+      // "done" only when every KO match (including bronze) is complete
+      const allKODone = koMatches.every((m) => m.status === "completed");
+      return allKODone ? "done" : "ko_active";
     }
     return "done";
   }, [allGroupDone, hasKO, advancesPerGroup, koMatches]);
@@ -417,7 +418,9 @@ function HostInner({
   // Progress per KO stage — used in header and court grouping.
   const koStageProgress = useMemo(() => {
     if (!hasKO) return [];
-    return (["quarter_final", "semi_final", "final"] as const)
+    const stages: MatchStage[] = ["quarter_final", "semi_final", "final"];
+    if (koMatches.some((m) => m.stage === "bronze")) stages.push("bronze");
+    return stages
       .map((stage) => {
         const sm = koMatches.filter((m) => m.stage === stage);
         if (sm.length === 0) return null;
@@ -611,6 +614,22 @@ function HostInner({
     return generated;
   }
 
+  const [completing, setCompleting] = useState(false);
+  const [completeErr, setCompleteErr] = useState<string | null>(null);
+
+  async function handleComplete(): Promise<void> {
+    setCompleting(true);
+    setCompleteErr(null);
+    try {
+      await completeTournament(tournament.id);
+      await reload();
+    } catch (e) {
+      setCompleteErr((e as Error).message);
+    } finally {
+      setCompleting(false);
+    }
+  }
+
   async function saveScore(
     match: TournamentMatch,
     s1: number,
@@ -705,6 +724,47 @@ function HostInner({
           </Link>
         </div>
       </header>
+
+      {tournament.status === "completed" && (
+        <div className="border-b border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 px-5 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 text-sm font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+              <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+            </svg>
+            Sessionen är avslutad
+          </div>
+          <Link
+            href={`/${tenant.slug}`}
+            className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+          >
+            ← Tillbaka till sessioner
+          </Link>
+        </div>
+      )}
+
+      {tournamentPhase === "done" && tournament.status !== "completed" && (
+        <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-5 py-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+              Alla matcher klara!
+            </p>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Markera sessionen som avslutad för att flytta den till arkivet.
+            </p>
+            {completeErr && (
+              <p className="text-xs text-red-600 mt-1">{completeErr}</p>
+            )}
+          </div>
+          <button
+            onClick={handleComplete}
+            disabled={completing}
+            className="shrink-0 px-5 py-2 rounded-md text-white text-sm font-semibold disabled:opacity-50 transition-opacity"
+            style={{ backgroundColor: accent }}
+          >
+            {completing ? "Avslutar…" : "Avsluta session →"}
+          </button>
+        </div>
+      )}
 
       {tournamentPhase === "ready_for_playoff" && (
         <PlayoffPanel
@@ -875,6 +935,13 @@ function HostInner({
 
           {rightTab === "tabeller" ? (
             <div className="space-y-6">
+              {hasKO && (
+                <KOResultsPanel
+                  koMatches={koMatches}
+                  teamMap={teamMap}
+                  playerMap={playerMap}
+                />
+              )}
               {groups.map((g, gi) => {
                 const groupTeams = teams.filter((t) => t.group_id === g.id);
                 const groupMatches = matches.filter((m) => m.group_id === g.id);
@@ -1382,6 +1449,13 @@ function MatchCard({
   const s1Ref = useRef<HTMLInputElement>(null);
   const s2Ref = useRef<HTMLInputElement>(null);
 
+  // Defensive reset: key={match.id} already causes a remount on match change,
+  // but this handles any edge case where the same component instance receives a new match.
+  useEffect(() => {
+    setS1(match.score_team1 != null ? String(match.score_team1) : "");
+    setS2(match.score_team2 != null ? String(match.score_team2) : "");
+  }, [match.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const a = parseInt(s1, 10);
   const b = parseInt(s2, 10);
   const aFilled = s1 !== "" && !Number.isNaN(a);
@@ -1496,6 +1570,66 @@ function MatchCard({
           {validationMsg}
         </div>
       )}
+    </div>
+  );
+}
+
+// Shows completed KO match results, grouped by stage (newest stage first).
+function KOResultsPanel({
+  koMatches,
+  teamMap,
+  playerMap,
+}: {
+  koMatches: TournamentMatch[];
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+}) {
+  const completed = koMatches.filter((m) => m.status === "completed");
+  if (completed.length === 0) return null;
+
+  const stageOrder: MatchStage[] = ["bronze", "final", "semi_final", "quarter_final"];
+  const grouped = stageOrder
+    .map((stage) => ({
+      stage,
+      matches: completed.filter((m) => m.stage === stage),
+    }))
+    .filter((g) => g.matches.length > 0);
+
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 font-medium text-sm text-zinc-700 dark:text-zinc-300">
+        Slutspelsresultat
+      </div>
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {grouped.map(({ stage, matches }) => (
+          <div key={stage}>
+            <div
+              className="px-3 py-1 text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: koStageBadgeColor(stage) }}
+            >
+              {KO_STAGE_LABEL[stage] ?? stage}
+            </div>
+            {matches.map((m) => {
+              const t1 = teamMap.get(m.team1_id);
+              const t2 = teamMap.get(m.team2_id);
+              const t1Wins = (m.score_team1 ?? 0) > (m.score_team2 ?? 0);
+              return (
+                <div key={m.id} className="px-3 py-1.5 flex items-center gap-2 text-xs">
+                  <span className={`flex-1 truncate font-medium ${t1Wins ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400"}`}>
+                    {t1 ? shortTeamName(t1, playerMap) : "?"}
+                  </span>
+                  <span className="tabular-nums font-bold shrink-0 text-zinc-700 dark:text-zinc-300">
+                    {m.score_team1 ?? "–"}–{m.score_team2 ?? "–"}
+                  </span>
+                  <span className={`flex-1 truncate font-medium text-right ${!t1Wins ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400"}`}>
+                    {t2 ? shortTeamName(t2, playerMap) : "?"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

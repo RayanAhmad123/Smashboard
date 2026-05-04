@@ -441,9 +441,18 @@ function HostInner({
 
   // Resting team for the current round (group phase)
   const restingTeamIdsThisRound = useMemo(() => {
-    if (!currentRound) return [];
-    return rests.filter((r) => r.round_number === currentRound).map((r) => r.team_id);
-  }, [rests, currentRound]);
+    // Collect every round number currently shown on a court. With session-based
+    // advancement courts can be on different rounds simultaneously, so we can't
+    // rely on a single currentRound value.
+    const displayedRounds = new Set<number>();
+    for (const m of matchByCourt.values()) {
+      displayedRounds.add(m.round_number);
+    }
+    if (displayedRounds.size === 0) return [];
+    return rests
+      .filter((r) => displayedRounds.has(r.round_number))
+      .map((r) => r.team_id);
+  }, [rests, matchByCourt]);
 
   async function saveScore(
     match: TournamentMatch,

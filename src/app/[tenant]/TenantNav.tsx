@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DarkModeToggle } from "@/components/DarkModeToggle";
 
 type Props = {
   slug: string;
@@ -36,7 +37,7 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
   }
 
   return (
-    <header className="border-b border-zinc-200 bg-white sticky top-0 z-30">
+    <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 sticky top-0 z-30">
       {/* Main row */}
       <div className="px-4 py-3 flex items-center gap-3 relative">
         <Link href={base} className="flex items-center gap-2 shrink-0">
@@ -51,7 +52,7 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
               >
                 {name.charAt(0)}
               </span>
-              <span className="font-semibold text-zinc-900 truncate hidden sm:block">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate hidden sm:block">
                 {name}
               </span>
             </>
@@ -66,8 +67,8 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
               href={it.href}
               className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
                 isActive(it.href)
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
             >
               {it.label}
@@ -95,10 +96,12 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
           + Ny session
         </Link>
 
+        <DarkModeToggle />
+
         <form action="/auth/signout" method="post" className="hidden sm:block">
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+            className="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800"
           >
             Logga ut
           </button>
@@ -106,15 +109,15 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
       </div>
 
       {/* Mobile nav tabs */}
-      <nav className="md:hidden border-t border-zinc-100 flex overflow-x-auto text-sm">
+      <nav className="md:hidden border-t border-zinc-100 dark:border-zinc-800 flex overflow-x-auto text-sm">
         {items.map((it) => (
           <Link
             key={it.href}
             href={it.href}
             className={`px-4 py-2 font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
               isActive(it.href)
-                ? "text-zinc-900"
-                : "text-zinc-500 border-transparent hover:text-zinc-700"
+                ? "text-zinc-900 dark:text-zinc-100"
+                : "text-zinc-500 dark:text-zinc-400 border-transparent hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
             style={isActive(it.href) ? { borderColor: accent } : undefined}
           >
@@ -124,7 +127,7 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
         <form action="/auth/signout" method="post" className="ml-auto shrink-0">
           <button
             type="submit"
-            className="px-4 py-2 text-sm font-medium text-zinc-500 border-b-2 border-transparent whitespace-nowrap"
+            className="px-4 py-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 border-b-2 border-transparent whitespace-nowrap"
           >
             Logga ut
           </button>

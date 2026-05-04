@@ -68,10 +68,9 @@ export function RegisterClient({
         setExistingReg((data as TournamentRegistration | null) ?? null);
       });
     supabaseClient
-      .from("tournament_registrations")
+      .from("tournament_teams")
       .select("id", { count: "exact", head: true })
       .eq("tournament_id", tournament.id)
-      .neq("status", "cancelled")
       .then(({ count }) => { if (count != null) setRegisteredCount(count); });
   }, [tenant.slug, tournament.id]);
 

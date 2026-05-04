@@ -85,6 +85,31 @@ export async function deleteTournament(id: string): Promise<void> {
   }
 }
 
+// Wipes all groups, matches, and group assignments for a draft tournament so a
+// fresh start can be made without stale data from a previous (possibly failed)
+// submission causing teams to appear in multiple groups.
+export async function resetTournamentGroupData(tournamentId: string): Promise<void> {
+  const sb = supabaseClient;
+  // Delete matches first (they reference groups and teams).
+  const { error: matchErr } = await sb
+    .from("tournament_matches")
+    .delete()
+    .eq("tournament_id", tournamentId);
+  if (matchErr) throw matchErr;
+  // Clear team group assignments.
+  const { error: teamErr } = await sb
+    .from("tournament_teams")
+    .update({ group_id: null })
+    .eq("tournament_id", tournamentId);
+  if (teamErr) throw teamErr;
+  // Delete groups.
+  const { error: groupErr } = await sb
+    .from("tournament_groups")
+    .delete()
+    .eq("tournament_id", tournamentId);
+  if (groupErr) throw groupErr;
+}
+
 export type CreateTournamentInput = {
   tenant_id: string;
   name: string;

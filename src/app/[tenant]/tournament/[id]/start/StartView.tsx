@@ -13,6 +13,7 @@ import type {
 import {
   updateDraftTeam,
   deleteDraftTeam,
+  resetTournamentGroupData,
   insertGroups,
   insertMatches,
   insertRoundRests,
@@ -305,6 +306,9 @@ export function StartView({
     setErr(null);
     setSubmitting(true);
     try {
+      // 0. Wipe any stale groups/matches from a previous failed submission.
+      await resetTournamentGroupData(tournament.id);
+
       // 1. Apply pairings to solo teams.
       const pairedUpdates = soloTeams
         .map((t) => ({ id: t.id, player2_id: pairing[t.id]! }))

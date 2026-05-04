@@ -173,12 +173,13 @@ export async function addDraftTeam(
       player1_id,
       player2_id,
       seed: null,
-      paid_at: null,
+      player1_paid_at: null,
+      player2_paid_at: null,
     })
     .select()
     .single();
   if (error) throw error;
-  return { ...(data as TournamentTeam), paid_at: data.paid_at ?? null };
+  return data as TournamentTeam;
 }
 
 export async function updateDraftTeam(
@@ -337,10 +338,15 @@ export async function getPlannedStats(
   return [...map.values()];
 }
 
-export async function markTeamPaid(teamId: string): Promise<void> {
+export async function setPlayerPaid(
+  teamId: string,
+  slot: 1 | 2,
+  paid: boolean
+): Promise<void> {
+  const column = slot === 1 ? "player1_paid_at" : "player2_paid_at";
   const { error } = await supabaseClient
     .from("tournament_teams")
-    .update({ paid_at: new Date().toISOString() })
+    .update({ [column]: paid ? new Date().toISOString() : null })
     .eq("id", teamId);
   if (error) throw error;
 }
@@ -438,7 +444,8 @@ export async function duplicateTournamentAsDraft(
         player1_id: t.player1_id,
         player2_id: t.player2_id,
         seed: null,
-        paid_at: null,
+        player1_paid_at: null,
+        player2_paid_at: null,
       }))
     );
     if (copyErr) throw copyErr;

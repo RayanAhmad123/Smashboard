@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentRegistration } from "@/lib/supabase/types";
-import { submitRegistration } from "@/lib/db/registrations";
-import { loadBookings, saveBooking } from "@/lib/playerBookings";
+import { submitRegistration, cancelRegistration } from "@/lib/db/registrations";
+import { loadBookings, removeBooking, saveBooking } from "@/lib/playerBookings";
+import { supabaseClient } from "@/lib/supabase/client";
 
 const FORMAT_LABEL: Record<string, string> = {
   gruppspel: "Gruppspel",
@@ -48,13 +49,30 @@ export function RegisterClient({
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<TournamentRegistration | null>(null);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [existingReg, setExistingReg] = useState<TournamentRegistration | null | "loading">(null);
+  const [registeredCount, setRegisteredCount] = useState(initialTakenSlots);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelErr, setCancelErr] = useState<string | null>(null);
 
   useEffect(() => {
     const bookings = loadBookings(tenant.slug);
-    if (bookings.some((b) => b.tournamentId === tournament.id)) {
-      setAlreadyRegistered(true);
-    }
+    const booking = bookings.find((b) => b.tournamentId === tournament.id);
+    if (!booking) return;
+    setExistingReg("loading");
+    supabaseClient
+      .from("tournament_registrations")
+      .select("*")
+      .eq("id", booking.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setExistingReg((data as TournamentRegistration | null) ?? null);
+      });
+    supabaseClient
+      .from("tournament_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("tournament_id", tournament.id)
+      .neq("status", "cancelled")
+      .then(({ count }) => { if (count != null) setRegisteredCount(count); });
   }, [tenant.slug, tournament.id]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -94,38 +112,101 @@ export function RegisterClient({
     }
   }
 
-  if (alreadyRegistered && !done) {
+  if ((existingReg !== null || existingReg === "loading") && !done) {
+    const reg = existingReg === "loading" ? null : existingReg;
+    const waitlisted = reg?.status === "pending";
+    const cancelled = reg?.status === "cancelled";
+    const cap = tournament.max_teams ?? 0;
+
+    async function onCancel() {
+      if (!reg) return;
+      if (!window.confirm("Avboka anmälan? Detta går inte att ångra.")) return;
+      setCancelling(true);
+      setCancelErr(null);
+      try {
+        await cancelRegistration(reg.id);
+        removeBooking(tenant.slug, reg.id);
+        setExistingReg({ ...reg, status: "cancelled" });
+      } catch (e) {
+        setCancelErr((e as Error).message);
+      } finally {
+        setCancelling(false);
+      }
+    }
+
     return (
       <div className="min-h-screen bg-zinc-50 text-zinc-900">
-        <div className="max-w-md mx-auto px-4 py-12 text-center">
-          <div
-            className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4 text-3xl"
-            style={{ backgroundColor: `${accent}22`, color: accent }}
-          >
-            ✓
-          </div>
-          <h1 className="text-2xl font-semibold mb-2">Redan anmäld</h1>
-          <p className="text-sm text-zinc-600 mb-1">
-            Du är redan anmäld till den här sessionen på den här enheten.
-          </p>
-          <p className="text-sm text-zinc-500">
-            {tournament.name} · {formatScheduled(tournament.scheduled_at)}
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-5 text-sm font-medium">
-            <Link
-              href={`/${tenant.slug}/play`}
-              className="underline"
-              style={{ color: accent }}
+        <div className="max-w-md mx-auto px-4 py-6">
+          <Link href={`/${tenant.slug}/play`} className="text-xs text-zinc-500">
+            ← Tillbaka
+          </Link>
+
+          <header className="mt-4 mb-6">
+            <div
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full mb-3"
+              style={
+                cancelled
+                  ? { backgroundColor: "#f4f4f5", color: "#a1a1aa" }
+                  : waitlisted
+                    ? { backgroundColor: "#fef3c7", color: "#d97706" }
+                    : { backgroundColor: `${accent}18`, color: accent }
+              }
             >
-              ← Andra sessioner
-            </Link>
-            <Link
-              href={`/${tenant.slug}/play?tab=mina`}
-              className="underline"
-              style={{ color: accent }}
-            >
-              Mina bokningar
-            </Link>
+              {cancelled ? "Avbokad" : waitlisted ? "⏳ Reservlista" : "✓ Anmäld"}
+            </div>
+            <h1 className="text-2xl font-semibold">{tournament.name}</h1>
+          </header>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-zinc-200 bg-white divide-y divide-zinc-100">
+              <Row label="Datum & tid" value={formatScheduled(tournament.scheduled_at)} />
+              <Row label="Format" value={FORMAT_LABEL[tournament.format] ?? tournament.format} />
+              <Row
+                label="Anmälda lag"
+                value={
+                  existingReg === "loading"
+                    ? "…"
+                    : cap > 0
+                      ? `${registeredCount} / ${cap}`
+                      : String(registeredCount)
+                }
+              />
+            </div>
+
+            {existingReg === "loading" ? (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-400">
+                Laddar din anmälan…
+              </div>
+            ) : reg ? (
+              <div className="rounded-xl border bg-white p-4" style={{ borderColor: cancelled ? "#e4e4e7" : accent }}>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">
+                  Ditt lag
+                </div>
+                <div className="space-y-2">
+                  <PlayerRow name={reg.player1_name} phone={reg.player1_phone} label="Spelare 1" />
+                  {reg.player2_name && (
+                    <PlayerRow name={reg.player2_name} phone={reg.player2_phone} label="Spelare 2" />
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {cancelErr && (
+              <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                {cancelErr}
+              </div>
+            )}
+
+            {!cancelled && reg && (
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={cancelling}
+                className="w-full py-3 rounded-md border border-red-200 text-red-600 text-sm font-semibold disabled:opacity-50 bg-white"
+              >
+                {cancelling ? "Avbokar…" : "Avboka anmälan"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -314,6 +395,29 @@ export function RegisterClient({
                 : "Anmäl"}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 gap-4">
+      <span className="text-xs font-medium text-zinc-500">{label}</span>
+      <span className="text-sm font-medium text-zinc-900 text-right">{value}</span>
+    </div>
+  );
+}
+
+function PlayerRow({ name, phone, label }: { name: string; phone: string | null; label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-8 w-8 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-semibold text-zinc-600 shrink-0">
+        {name.charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-zinc-900 truncate">{name}</div>
+        <div className="text-xs text-zinc-400">{label}{phone ? ` · ${phone}` : ""}</div>
       </div>
     </div>
   );

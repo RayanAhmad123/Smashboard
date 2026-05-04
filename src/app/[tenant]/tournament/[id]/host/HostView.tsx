@@ -14,9 +14,9 @@ import type {
   MatchStage,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
-import { markTeamPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
+import { setPlayerPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
 import { computeStandings, teamName, stageLabel, shortTeamName } from "@/lib/standings";
-import { PaymentPanel, type PaymentTeamRow } from "@/components/PaymentPanel";
+import { PaymentPanel, type PaymentPlayerRow } from "@/components/PaymentPanel";
 import {
   badgeClassForMatch,
   buildGroupIndex,
@@ -179,13 +179,25 @@ function HostInner({
   const accent = tenant.primary_color || "#10b981";
 
   const [rightTab, setRightTab] = useState<"tabeller" | "betalning">("tabeller");
-  const [paidIds, setPaidIds] = useState<Set<string>>(
-    () => new Set(teams.filter((t) => t.paid_at).map((t) => t.id))
-  );
+  type PaidKey = `${string}-${1 | 2}`;
+  const [paidKeys, setPaidKeys] = useState<Set<PaidKey>>(() => {
+    const s = new Set<PaidKey>();
+    for (const t of teams) {
+      if (t.player1_paid_at) s.add(`${t.id}-1` as PaidKey);
+      if (t.player2_paid_at) s.add(`${t.id}-2` as PaidKey);
+    }
+    return s;
+  });
 
-  async function handleMarkPaid(teamId: string) {
-    await markTeamPaid(teamId);
-    setPaidIds((prev) => new Set([...prev, teamId]));
+  async function handleSetPaid(teamId: string, slot: 1 | 2, paid: boolean) {
+    await setPlayerPaid(teamId, slot, paid);
+    setPaidKeys((prev) => {
+      const next = new Set(prev);
+      const key = `${teamId}-${slot}` as PaidKey;
+      if (paid) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   }
 
   const playerMap = useMemo(() => {
@@ -205,15 +217,34 @@ function HostInner({
   }, [groups]);
   const groupIndexMap = useMemo(() => buildGroupIndex(groups), [groups]);
 
-  const paymentRows: PaymentTeamRow[] = useMemo(
-    () =>
-      teams.map((t) => ({
-        id: t.id,
-        displayName: teamName(t, playerMap),
-        paid: paidIds.has(t.id),
-      })),
-    [teams, playerMap, paidIds]
-  );
+  const paymentRows: PaymentPlayerRow[] = useMemo(() => {
+    const rows: PaymentPlayerRow[] = [];
+    for (const t of teams) {
+      const p1 = playerMap.get(t.player1_id);
+      if (p1) {
+        rows.push({
+          key: `${t.id}-1`,
+          teamId: t.id,
+          slot: 1,
+          displayName: p1.name,
+          paid: paidKeys.has(`${t.id}-1` as PaidKey),
+        });
+      }
+      if (t.player2_id) {
+        const p2 = playerMap.get(t.player2_id);
+        if (p2) {
+          rows.push({
+            key: `${t.id}-2`,
+            teamId: t.id,
+            slot: 2,
+            displayName: p2.name,
+            paid: paidKeys.has(`${t.id}-2` as PaidKey),
+          });
+        }
+      }
+    }
+    return rows;
+  }, [teams, playerMap, paidKeys]);
 
   const completedCount = useMemo(
     () => matches.filter((m) => m.status === "completed").length,
@@ -719,9 +750,9 @@ function HostInner({
             </div>
           ) : (
             <PaymentPanel
-              teams={paymentRows}
+              players={paymentRows}
               accent={tenant.primary_color || "#10b981"}
-              onMarkPaid={handleMarkPaid}
+              onSetPaid={handleSetPaid}
             />
           )}
         </section>

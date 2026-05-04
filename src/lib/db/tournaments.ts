@@ -173,11 +173,12 @@ export async function addDraftTeam(
       player1_id,
       player2_id,
       seed: null,
+      paid_at: null,
     })
     .select()
     .single();
   if (error) throw error;
-  return data as TournamentTeam;
+  return { ...(data as TournamentTeam), paid_at: data.paid_at ?? null };
 }
 
 export async function updateDraftTeam(
@@ -437,6 +438,7 @@ export async function duplicateTournamentAsDraft(
         player1_id: t.player1_id,
         player2_id: t.player2_id,
         seed: null,
+        paid_at: null,
       }))
     );
     if (copyErr) throw copyErr;

@@ -264,7 +264,6 @@ function HostInner({
 
   const matchByCourt = useMemo(() => {
     const map = new Map<string, TournamentMatch>();
-    if (currentRound === null) return map;
 
     // During KO phase all matches in the same stage play simultaneously —
     // find the active KO round and show every match in it regardless of
@@ -282,24 +281,30 @@ function HostInner({
       return map;
     }
 
-    // Group phase: show only the current round's matches.
+    // Group phase: session-based — each court independently advances to its
+    // next unfinished match rather than waiting for the whole round to finish.
     for (const c of courts) {
-      const found = matches.find(
-        (mm) => mm.court_id === c.id && mm.round_number === currentRound
-      );
-      if (found) map.set(c.id, found);
+      const next = matches
+        .filter((m) => m.court_id === c.id && m.stage === "group" && m.status !== "completed")
+        .sort((a, b) => a.round_number - b.round_number)[0];
+      if (next) map.set(c.id, next);
     }
     return map;
-  }, [courts, matches, currentRound]);
+  }, [courts, matches]);
 
+  // Round progress counter: how many group matches in the current round are done.
   const roundCompleted = useMemo(() => {
-    let n = 0;
-    for (const m of matchByCourt.values()) {
-      if (m.status === "completed") n++;
-    }
-    return n;
-  }, [matchByCourt]);
-  const roundTotal = matchByCourt.size;
+    if (currentRound === null) return 0;
+    return matches.filter(
+      (m) => m.stage === "group" && m.round_number === currentRound && m.status === "completed"
+    ).length;
+  }, [matches, currentRound]);
+  const roundTotal = useMemo(() => {
+    if (currentRound === null) return 0;
+    return matches.filter(
+      (m) => m.stage === "group" && m.round_number === currentRound
+    ).length;
+  }, [matches, currentRound]);
 
   // Only courts that this tournament actually uses, sorted by group of first match.
   const tournamentCourts = useMemo(() => {
@@ -337,38 +342,25 @@ function HostInner({
   const koMatches = useMemo(() => matches.filter((m) => m.stage !== "group"), [matches]);
   const allGroupDone = groupMatches.length > 0 && groupMatches.every((m) => m.status === "completed");
 
-  // For each court whose current-round match is done, look ahead to the next
-  // round match on that same court (group phase only).
-  const nextMatchByCourt = useMemo(() => {
-    const map = new Map<string, TournamentMatch>();
-    if (currentRound === null) return map;
-    const isKOPhase = koMatches.some((m) => m.status !== "completed");
-    if (isKOPhase) return map;
-    for (const court of tournamentCourts) {
-      const cur = matchByCourt.get(court.id);
-      if (!cur || cur.status !== "completed") continue;
-      const next = matches
-        .filter((m) => m.court_id === court.id && m.round_number > currentRound)
-        .sort((a, b) => a.round_number - b.round_number)[0];
-      if (next && next.status !== "completed") map.set(court.id, next);
-    }
-    return map;
-  }, [currentRound, koMatches, tournamentCourts, matchByCourt, matches]);
-
-  // For each next-round match, collect the teams that are still playing in the
-  // current round (blocking it from opening).
+  // For each court's upcoming match, collect any teams that are still finishing
+  // an earlier-round match on a different court. A match is only unblocked once
+  // all of its players' prior matches have been scored.
   const blockedBy = useMemo(() => {
     const map = new Map<string, TournamentTeam[]>();
-    for (const [courtId, next] of nextMatchByCourt.entries()) {
+    const isKOPhase = koMatches.some((m) => m.status !== "completed");
+    if (isKOPhase) return map;
+    for (const [courtId, m] of matchByCourt.entries()) {
       const blocking: TournamentTeam[] = [];
-      for (const teamId of [next.team1_id, next.team2_id]) {
-        const stillPlaying = matches.some(
-          (m) =>
-            m.round_number === currentRound &&
-            m.status !== "completed" &&
-            (m.team1_id === teamId || m.team2_id === teamId)
+      for (const teamId of [m.team1_id, m.team2_id]) {
+        const hasEarlierUnfinished = matches.some(
+          (other) =>
+            other.court_id !== courtId &&
+            other.stage === "group" &&
+            other.status !== "completed" &&
+            (other.team1_id === teamId || other.team2_id === teamId) &&
+            other.round_number < m.round_number
         );
-        if (stillPlaying) {
+        if (hasEarlierUnfinished) {
           const t = teamMap.get(teamId);
           if (t) blocking.push(t);
         }
@@ -376,7 +368,7 @@ function HostInner({
       if (blocking.length > 0) map.set(courtId, blocking);
     }
     return map;
-  }, [nextMatchByCourt, matches, currentRound, teamMap]);
+  }, [matchByCourt, matches, koMatches, teamMap]);
   const hasKO = koMatches.length > 0;
   const advancesPerGroup = tournament.advances_per_group ?? 0;
 
@@ -572,59 +564,15 @@ function HostInner({
             )}
             {sortedCourts.map((c) => {
               const m = matchByCourt.get(c.id);
-              // During KO phase skip courts with no match — all active matches play simultaneously
               const isKOPhase = koMatches.some((km) => km.status !== "completed");
               if (!m) {
                 if (isKOPhase) return null;
-                return (
-                  <CourtIdle
-                    key={c.id}
-                    name={c.name}
-                    message={
-                      currentRound === null
-                        ? "Klar – inga fler matcher"
-                        : "Vilar denna runda"
-                    }
-                  />
-                );
+                return <CourtIdle key={c.id} name={c.name} message="Klar – inga fler matcher" />;
               }
-              if (m.status === "completed") {
-                const next = nextMatchByCourt.get(c.id);
-                if (next) {
-                  const blocking = blockedBy.get(c.id);
-                  if (blocking && blocking.length > 0) {
-                    return (
-                      <LockedCard
-                        key={next.id}
-                        match={next}
-                        team1={teamMap.get(next.team1_id)!}
-                        team2={teamMap.get(next.team2_id)!}
-                        playerMap={playerMap}
-                        courtName={c.name}
-                        stage={stageLabel(next, groupMap)}
-                        badgeClass={badgeClassForMatch(next, groupIndexMap)}
-                        blockingTeams={blocking}
-                      />
-                    );
-                  }
-                  return (
-                    <MatchCard
-                      key={next.id}
-                      match={next}
-                      team1={teamMap.get(next.team1_id)!}
-                      team2={teamMap.get(next.team2_id)!}
-                      playerMap={playerMap}
-                      courtName={c.name}
-                      stage={stageLabel(next, groupMap)}
-                      badgeClass={badgeClassForMatch(next, groupIndexMap)}
-                      onSave={(s1, s2) => saveScore(next, s1, s2)}
-                      busy={busy === next.id}
-                      gamesPerMatch={tournament.games_per_match}
-                    />
-                  );
-                }
+              const blocking = blockedBy.get(c.id);
+              if (blocking && blocking.length > 0) {
                 return (
-                  <WaitingCard
+                  <LockedCard
                     key={m.id}
                     match={m}
                     team1={teamMap.get(m.team1_id)!}
@@ -633,6 +581,7 @@ function HostInner({
                     courtName={c.name}
                     stage={stageLabel(m, groupMap)}
                     badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                    blockingTeams={blocking}
                   />
                 );
               }

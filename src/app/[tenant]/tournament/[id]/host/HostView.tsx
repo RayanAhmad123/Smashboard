@@ -11,6 +11,7 @@ import type {
   TournamentGroup,
   Court,
   Player,
+  MatchStage,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
 import { markTeamPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
@@ -449,7 +450,10 @@ function HostInner({
             )}
             {sortedCourts.map((c) => {
               const m = matchByCourt.get(c.id);
+              // During KO phase skip courts with no match — all active matches play simultaneously
+              const isKOPhase = koMatches.some((km) => km.status !== "completed");
               if (!m) {
+                if (isKOPhase) return null;
                 return (
                   <CourtIdle
                     key={c.id}
@@ -667,13 +671,12 @@ function PlayoffPanel({
       const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
       return Math.floor((totalAdvancing - byes) / 2);
     }
-    if (lastCompletedKOStage === "semi_final") {
-      return 1 + (hasBronze ? 1 : 0);
-    }
     const completedStageMatches = koMatches.filter(
       (m) => m.stage === lastCompletedKOStage && m.status === "completed"
     );
-    return Math.ceil(completedStageMatches.length / 2);
+    const matchCount = Math.ceil(completedStageMatches.length / 2);
+    const bronzeCount = hasBronze && nextStage(lastCompletedKOStage as MatchStage) === "final" ? 1 : 0;
+    return matchCount + bronzeCount;
   }, [isFirstRound, groupStandings, byes, koMatches, lastCompletedKOStage, hasBronze]);
 
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(

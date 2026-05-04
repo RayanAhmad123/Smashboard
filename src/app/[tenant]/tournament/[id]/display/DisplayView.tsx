@@ -426,7 +426,7 @@ function KOView({
   accent: string;
 }) {
   const koCourts = useMemo(
-    () => courts.filter((c) => koMatches.some((m) => m.court_id === c.id)),
+    () => courts.filter((c) => koMatches.some((m) => m.court_id === c.id && m.status !== "completed")),
     [courts, koMatches]
   );
 

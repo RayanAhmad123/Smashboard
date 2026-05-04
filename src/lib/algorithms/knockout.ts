@@ -188,7 +188,8 @@ export function generateNextKORound(
 
   // Pair winners: match 0 winner vs match 1 winner, etc.
   for (let i = 0; i < winners.length - 1; i += 2) {
-    const court = courts[i % courts.length] ?? null;
+    const matchIdx = i / 2;
+    const court = courts[matchIdx % courts.length] ?? null;
     matches.push(makeMatch(tournamentId, winners[i], winners[i + 1], stage, court, roundNumber));
   }
 

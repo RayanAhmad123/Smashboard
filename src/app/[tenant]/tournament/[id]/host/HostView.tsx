@@ -11,6 +11,7 @@ import type {
   TournamentGroup,
   Court,
   Player,
+  MatchStage,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
 import { setPlayerPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
@@ -50,7 +51,7 @@ export function HostView({
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Loaded | null> => {
     try {
       const [tRes, gRes, teamsRes, matchesRes, courtsRes] = await Promise.all([
         supabaseClient
@@ -101,7 +102,7 @@ export function HostView({
       ]);
       if (playersRes.error) throw playersRes.error;
 
-      setData({
+      const loaded: Loaded = {
         tournament: tRes.data as Tournament,
         groups: (gRes.data ?? []) as TournamentGroup[],
         teams,
@@ -109,9 +110,12 @@ export function HostView({
         players: (playersRes.data ?? []) as Player[],
         courts: (courtsRes.data ?? []) as Court[],
         rests,
-      });
+      };
+      setData(loaded);
+      return loaded;
     } catch (e) {
       setErr((e as Error).message);
+      return null;
     }
   }, [tenant.id, tournamentId]);
 
@@ -168,7 +172,7 @@ function HostInner({
 }: {
   tenant: Tenant;
   data: Loaded;
-  reload: () => Promise<void>;
+  reload: () => Promise<Loaded | null>;
   busy: string | null;
   setBusy: (s: string | null) => void;
 }) {
@@ -265,18 +269,22 @@ function HostInner({
   const matchByCourt = useMemo(() => {
     const map = new Map<string, TournamentMatch>();
 
-    // During KO phase all matches in the same stage play simultaneously —
-    // find the active KO round and show every match in it regardless of
-    // which group-play round number that slot corresponds to.
+    // KO phase: session-based — each court independently shows its next
+    // incomplete KO match so QF and SF can run simultaneously.
     const incompleteKO = matches.filter(
       (m) => m.stage !== "group" && m.status !== "completed"
     );
     if (incompleteKO.length > 0) {
-      const koRound = Math.min(...incompleteKO.map((m) => m.round_number));
-      for (const m of matches) {
-        if (m.stage !== "group" && m.round_number === koRound && m.court_id) {
-          map.set(m.court_id, m);
-        }
+      for (const c of courts) {
+        const next = matches
+          .filter(
+            (m) =>
+              m.court_id === c.id &&
+              m.stage !== "group" &&
+              m.status !== "completed"
+          )
+          .sort((a, b) => a.round_number - b.round_number)[0];
+        if (next) map.set(c.id, next);
       }
       return map;
     }
@@ -419,15 +427,6 @@ function HostInner({
     return [...advancingIds].filter((id) => !playedInKO.has(id));
   }, [groups, teams, groupMatches, playerMap, advancesPerGroup, koMatches]);
 
-  // Ready to advance when: KO is in progress, no incomplete non-bronze
-  // matches, and the final hasn't been played yet (tournamentPhase handles
-  // the "done" case).
-  const koRoundReadyToAdvance = useMemo(() => {
-    if (tournamentPhase !== "ko_active") return false;
-    if (activeKOStage !== null) return false; // still in progress
-    return koMatches.length > 0;
-  }, [tournamentPhase, activeKOStage, koMatches]);
-
   // Group standings for playoff panel
   const groupStandings = useMemo((): GroupStanding[] => {
     if (advancesPerGroup === 0) return [];
@@ -454,6 +453,109 @@ function HostInner({
       .map((r) => r.team_id);
   }, [rests, matchByCourt]);
 
+  // Automatically generates the next KO round's match for each completed pair
+  // of feeder matches, enabling QF and SF to run simultaneously.
+  async function autoAdvanceKO(loaded: Loaded): Promise<boolean> {
+    const { tournament: t, courts: c, matches: allMatches, groups: g, teams: tm } = loaded;
+    const koAll = allMatches.filter((m) => m.stage !== "group");
+    if (koAll.length === 0) return false;
+
+    const completedNonBronze = koAll.filter(
+      (m) => m.status === "completed" && m.stage !== "bronze"
+    );
+    if (completedNonBronze.length === 0) return false;
+
+    // Compute external bye teams (advancing teams that haven't played KO yet).
+    const apg = t.advances_per_group ?? 0;
+    const externalByeIds: string[] = [];
+    if (apg > 0) {
+      const gMatches = allMatches.filter((m) => m.stage === "group");
+      const pm = new Map<string, Player>();
+      for (const p of loaded.players) pm.set(p.id, p);
+      const advancingIds = new Set<string>();
+      for (const grp of g) {
+        const gTeams = tm.filter((tt) => tt.group_id === grp.id);
+        const gM = gMatches.filter((m) => m.group_id === grp.id);
+        const standings = computeStandings(gTeams, gM, pm).slice(0, apg);
+        for (const s of standings) advancingIds.add(s.team_id);
+      }
+      const playedInKO = new Set<string>(koAll.flatMap((m) => [m.team1_id, m.team2_id]));
+      externalByeIds.push(...[...advancingIds].filter((id) => !playedInKO.has(id)));
+    }
+
+    const allKORounds = [
+      ...new Set(koAll.filter((m) => m.stage !== "bronze").map((m) => m.round_number)),
+    ].sort((a, b) => a - b);
+    const firstKORound = allKORounds[0] ?? 1;
+
+    let generated = false;
+
+    for (const roundNum of allKORounds) {
+      const roundMatches = koAll
+        .filter((m) => m.round_number === roundNum && m.stage !== "bronze")
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const nextRound = roundNum + 1;
+      const nextRoundMatches = koAll.filter(
+        (m) => m.round_number === nextRound && m.stage !== "bronze"
+      );
+
+      const relevantByeIds = roundNum === firstKORound ? externalByeIds : [];
+      const n = roundMatches.length;
+
+      if (relevantByeIds.length > 0) {
+        // Has external byes: require all matches in round to finish, then generate all.
+        if (!roundMatches.every((m) => m.status === "completed")) continue;
+        if (nextRoundMatches.length > 0) continue;
+        const next = generateNextKORound(roundMatches as TournamentMatch[], relevantByeIds, c, t.id, t.has_bronze);
+        if (next.length > 0) { await insertMatches(next); generated = true; }
+        continue;
+      }
+
+      // No external byes: generate pair by pair as soon as both feeders complete.
+      const newMatches: Omit<TournamentMatch, "id" | "created_at">[] = [];
+      for (let i = 0; i < Math.floor(n / 2); i++) {
+        const m1 = roundMatches[i];
+        const m2 = roundMatches[n - 1 - i];
+        if (m1.status !== "completed" || m2.status !== "completed") continue;
+
+        const w1 = (m1.score_team1 ?? 0) > (m1.score_team2 ?? 0) ? m1.team1_id : m1.team2_id;
+        const w2 = (m2.score_team1 ?? 0) > (m2.score_team2 ?? 0) ? m2.team1_id : m2.team2_id;
+
+        const alreadyExists =
+          nextRoundMatches.some(
+            (m) => (m.team1_id === w1 && m.team2_id === w2) || (m.team1_id === w2 && m.team2_id === w1)
+          ) ||
+          newMatches.some(
+            (m) => (m.team1_id === w1 && m.team2_id === w2) || (m.team1_id === w2 && m.team2_id === w1)
+          );
+        if (alreadyExists) continue;
+
+        const nextTotal = Math.floor(n / 2);
+        const stage: MatchStage = nextTotal === 1 ? "final" : nextTotal <= 2 ? "semi_final" : "quarter_final";
+        const court = c.find((cc) => cc.id === m1.court_id) ?? c[i % c.length] ?? null;
+
+        newMatches.push({
+          tournament_id: t.id, group_id: null, round_number: nextRound,
+          court_id: court?.id ?? null, team1_id: w1, team2_id: w2,
+          score_team1: null, score_team2: null, status: "scheduled", stage,
+        });
+
+        if (t.has_bronze && stage === "final" && n === 2) {
+          const l1 = (m1.score_team1 ?? 0) > (m1.score_team2 ?? 0) ? m1.team2_id : m1.team1_id;
+          const l2 = (m2.score_team1 ?? 0) > (m2.score_team2 ?? 0) ? m2.team2_id : m2.team1_id;
+          const bronzeCourt = c.find((cc) => cc.id === m2.court_id) ?? c[Math.floor(c.length / 2)] ?? c[0] ?? null;
+          newMatches.push({
+            tournament_id: t.id, group_id: null, round_number: nextRound,
+            court_id: bronzeCourt?.id ?? null, team1_id: l1, team2_id: l2,
+            score_team1: null, score_team2: null, status: "scheduled", stage: "bronze",
+          });
+        }
+      }
+      if (newMatches.length > 0) { await insertMatches(newMatches); generated = true; }
+    }
+    return generated;
+  }
+
   async function saveScore(
     match: TournamentMatch,
     s1: number,
@@ -462,7 +564,11 @@ function HostInner({
     setBusy(match.id);
     try {
       await updateMatchScore(match.id, s1, s2, "completed");
-      await reload();
+      const loaded = await reload();
+      if (match.stage !== "group" && loaded) {
+        const generated = await autoAdvanceKO(loaded);
+        if (generated) await reload();
+      }
     } finally {
       setBusy(null);
     }
@@ -533,7 +639,7 @@ function HostInner({
         </div>
       </header>
 
-      {(tournamentPhase === "ready_for_playoff" || koRoundReadyToAdvance) && (
+      {tournamentPhase === "ready_for_playoff" && (
         <PlayoffPanel
           tournament={tournament}
           groupStandings={groupStandings}
@@ -760,7 +866,8 @@ function PlayoffPanel({
   byeTeamIds: string[];
   teamMap: Map<string, TournamentTeam>;
   playerMap: Map<string, Player>;
-  onGenerated: () => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onGenerated: () => Promise<any>;
 }) {
   const isFirstRound = koMatches.length === 0;
   const hasBronze = tournament.has_bronze;

@@ -1035,9 +1035,15 @@ function PlayoffPanel({
     chosenCourts.length > 0 &&
     byeGroupIds.size === byes;
 
+  const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
   const stageLabel = isFirstRound
-    ? firstKOStageLabel(groupStandings.reduce((s, g) => s + g.standings.length, 0))
+    ? firstKOStageLabel(totalAdvancing)
     : stageLabelForEntrants(nextRoundEntrants);
+
+  const bracketPath = useMemo(
+    () => (isFirstRound ? computeBracketPath(totalAdvancing, hasBronze) : []),
+    [isFirstRound, totalAdvancing, hasBronze]
+  );
 
   async function generate() {
     if (!canGenerate) return;
@@ -1125,11 +1131,51 @@ function PlayoffPanel({
         </div>
       )}
 
-      {/* Bracket preview */}
+      {/* Bracket roadmap — shows the full path and which step is being generated now */}
+      {isFirstRound && bracketPath.length > 0 && (
+        <div className="mb-4 flex items-center gap-1.5 flex-wrap">
+          {bracketPath.map((step, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              {i > 0 && <span className="text-zinc-300 text-xs">→</span>}
+              <div
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border ${
+                  step.isNow
+                    ? "text-white border-transparent"
+                    : "text-zinc-400 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                }`}
+                style={step.isNow ? { backgroundColor: koStageBadgeColor(
+                  step.label === "Kvartsfinal" ? "quarter_final"
+                    : step.label === "Semifinal" ? "semi_final"
+                    : step.label === "Final" ? "final"
+                    : step.label === "Bronsmatch" ? "bronze"
+                    : "quarter_final"
+                ) } : undefined}
+              >
+                <span>{step.label}</span>
+                <span className={step.isNow ? "text-white/70" : "text-zinc-300"}>
+                  {step.matchCount === 1 ? "" : ` ×${step.matchCount}`}
+                </span>
+                {!step.isNow && (
+                  <span className="text-[10px] text-zinc-300 font-normal ml-0.5">auto</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Match preview — only shows the matches being generated right now */}
       {isFirstRound && previewMatchups.length > 0 && (
         <div className="mb-4 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-          <div className="px-3 py-1.5 text-xs font-semibold bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-            Förhandsvisning av matchningar
+          <div className="px-3 py-1.5 text-xs font-semibold bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center justify-between">
+            <span>
+              {stageLabel === "Inledningsrunda"
+                ? "Inledningsrunda — dessa matcher spelas först"
+                : "Matchningar"}
+            </span>
+            {stageLabel === "Inledningsrunda" && (
+              <span className="text-zinc-400 font-normal">övriga kvartsfinalsmatcher auto-genereras</span>
+            )}
           </div>
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {previewMatchups.map((m, i) => {
@@ -1245,6 +1291,7 @@ function PlayoffPanel({
 function firstKOStageLabel(total: number): string {
   if (total <= 2) return "Final";
   if (total <= 4) return "Semifinal";
+  if (total > 8) return "Inledningsrunda"; // play-in before QF
   return "Kvartsfinal";
 }
 
@@ -1252,6 +1299,34 @@ function stageLabelForEntrants(n: number): string {
   if (n === 2) return "Final";
   if (n <= 4) return "Semifinal";
   return "Kvartsfinal";
+}
+
+// Returns the full bracket path for display in the panel, given the number of advancing teams.
+// Each step is { label, matchCount, isNow } where isNow = first step being generated.
+type BracketStep = { label: string; matchCount: number; isNow: boolean };
+function computeBracketPath(totalAdvancing: number, hasBronze: boolean): BracketStep[] {
+  const steps: BracketStep[] = [];
+
+  if (totalAdvancing > 8) {
+    const playIn = totalAdvancing - 8;
+    steps.push({ label: "Inledningsrunda", matchCount: playIn, isNow: true });
+    steps.push({ label: "Kvartsfinal", matchCount: 4, isNow: false });
+    steps.push({ label: "Semifinal", matchCount: 2, isNow: false });
+  } else if (totalAdvancing > 4) {
+    // Some teams may get byes to SF, remaining play QF
+    const qfMatches = Math.floor(totalAdvancing / 2);
+    steps.push({ label: "Kvartsfinal", matchCount: qfMatches, isNow: true });
+    steps.push({ label: "Semifinal", matchCount: 2, isNow: false });
+  } else if (totalAdvancing > 2) {
+    const sfMatches = Math.floor(totalAdvancing / 2);
+    const isPlayIn = totalAdvancing === 3;
+    steps.push({ label: isPlayIn ? "Inledningsrunda" : "Semifinal", matchCount: sfMatches, isNow: true });
+    if (isPlayIn) steps.push({ label: "Final", matchCount: 1, isNow: false });
+  }
+
+  steps.push({ label: "Final", matchCount: 1, isNow: totalAdvancing <= 2 });
+  if (hasBronze) steps.push({ label: "Bronsmatch", matchCount: 1, isNow: false });
+  return steps;
 }
 
 function MatchCard({

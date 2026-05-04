@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseClient } from "@/lib/supabase/client";
 import { cancelRegistration } from "@/lib/db/registrations";
 import {
@@ -58,6 +58,61 @@ export function PlayHomeClient({
 }) {
   const accent = tenant.primary_color || "#10b981";
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [openItems, setOpenItems] = useState<OpenItem[]>(open);
+
+  const refreshOpen = useCallback(async () => {
+    try {
+      const { data: tournaments } = await supabaseClient
+        .from("tournaments")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .eq("status", "draft")
+        .eq("open_registration", true)
+        .is("archived_at", null)
+        .order("scheduled_at", { ascending: true, nullsFirst: false });
+      if (!tournaments) return;
+      const counts = await Promise.all(
+        (tournaments as Tournament[]).map((t) =>
+          supabaseClient
+            .from("tournament_teams")
+            .select("id", { count: "exact", head: true })
+            .eq("tournament_id", t.id)
+            .then((r) => r.count ?? 0)
+        )
+      );
+      setOpenItems(
+        (tournaments as Tournament[]).map((t, i) => ({
+          tournament: t,
+          takenSlots: counts[i],
+        }))
+      );
+    } catch {
+      // silently ignore refresh errors
+    }
+  }, [tenant.id]);
+
+  useEffect(() => {
+    const channel = supabaseClient
+      .channel(`play-open-${tenant.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tournaments",
+          filter: `tenant_id=eq.${tenant.id}`,
+        },
+        () => { void refreshOpen(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tournament_teams" },
+        () => { void refreshOpen(); }
+      )
+      .subscribe();
+
+    return () => { void supabaseClient.removeChannel(channel); };
+  }, [tenant.id, refreshOpen]);
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -104,7 +159,7 @@ export function PlayHomeClient({
         </div>
 
         {tab === "open" ? (
-          <OpenList tenant={tenant} accent={accent} items={open} />
+          <OpenList tenant={tenant} accent={accent} items={openItems} />
         ) : (
           <BookingsList tenant={tenant} accent={accent} />
         )}

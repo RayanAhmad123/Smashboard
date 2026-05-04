@@ -192,6 +192,26 @@ export function DisplayView({
       if (queued[1]) nextByCourt.set(c.id, queued[1]);
     }
 
+    // For each court's current match, find teams that still have an incomplete
+    // earlier-round match (they haven't finished yet → court is "waiting").
+    const lockedByCourt = new Map<string, TournamentTeam[]>();
+    for (const [courtId, match] of byCourt) {
+      const blocking: TournamentTeam[] = [];
+      for (const teamId of [match.team1_id, match.team2_id]) {
+        const stillBusy = data.matches.some(
+          (m) =>
+            m.round_number < match.round_number &&
+            m.status !== "completed" &&
+            (m.team1_id === teamId || m.team2_id === teamId)
+        );
+        if (stillBusy) {
+          const t = teamMap.get(teamId);
+          if (t) blocking.push(t);
+        }
+      }
+      if (blocking.length > 0) lockedByCourt.set(courtId, blocking);
+    }
+
     const completed = data.matches.filter((m) => m.status === "completed").length;
     const total = data.matches.length;
     const hasGroups = data.groups.length > 0;
@@ -301,6 +321,7 @@ export function DisplayView({
       groupIndexMap,
       byCourt,
       nextByCourt,
+      lockedByCourt,
       completed,
       total,
       hasGroups,
@@ -372,6 +393,7 @@ export function DisplayView({
             courts={computed.tournamentCourts}
             byCourt={computed.byCourt}
             nextByCourt={computed.nextByCourt}
+            lockedByCourt={computed.lockedByCourt}
             teamMap={computed.teamMap}
             groupMap={computed.groupMap}
             groupIndexMap={computed.groupIndexMap}
@@ -394,6 +416,7 @@ export function DisplayView({
                   courts={computed.tournamentCourts}
                   byCourt={computed.byCourt}
                   nextByCourt={computed.nextByCourt}
+                  lockedByCourt={computed.lockedByCourt}
                   teamMap={computed.teamMap}
                   groupMap={computed.groupMap}
                   groupIndexMap={computed.groupIndexMap}
@@ -495,6 +518,7 @@ function KOView({
   courts,
   byCourt,
   nextByCourt,
+  lockedByCourt,
   teamMap,
   groupMap,
   groupIndexMap,
@@ -506,6 +530,7 @@ function KOView({
   courts: Court[];
   byCourt: Map<string, TournamentMatch>;
   nextByCourt: Map<string, TournamentMatch>;
+  lockedByCourt: Map<string, TournamentTeam[]>;
   teamMap: Map<string, TournamentTeam>;
   groupMap: Map<string, TournamentGroup>;
   groupIndexMap: Map<string, number>;
@@ -556,6 +581,7 @@ function KOView({
           courts={displayCourts}
           byCourt={byCourt}
           nextByCourt={nextByCourt}
+          lockedByCourt={lockedByCourt}
           teamMap={teamMap}
           groupMap={groupMap}
           groupIndexMap={groupIndexMap}
@@ -725,6 +751,7 @@ function MatchesView({
   courts,
   byCourt,
   nextByCourt,
+  lockedByCourt,
   teamMap,
   groupMap,
   groupIndexMap,
@@ -734,6 +761,7 @@ function MatchesView({
   courts: Court[];
   byCourt: Map<string, TournamentMatch>;
   nextByCourt: Map<string, TournamentMatch>;
+  lockedByCourt: Map<string, TournamentTeam[]>;
   teamMap: Map<string, TournamentTeam>;
   groupMap: Map<string, TournamentGroup>;
   groupIndexMap: Map<string, number>;
@@ -764,6 +792,7 @@ function MatchesView({
           court={court}
           match={byCourt.get(court.id) ?? null}
           nextMatch={nextByCourt.get(court.id) ?? null}
+          blockingTeams={lockedByCourt.get(court.id) ?? null}
           teamMap={teamMap}
           groupMap={groupMap}
           groupIndexMap={groupIndexMap}
@@ -779,6 +808,7 @@ function CourtCard({
   court,
   match,
   nextMatch,
+  blockingTeams,
   teamMap,
   groupMap,
   groupIndexMap,
@@ -788,6 +818,7 @@ function CourtCard({
   court: Court;
   match: TournamentMatch | null;
   nextMatch: TournamentMatch | null;
+  blockingTeams: TournamentTeam[] | null;
   teamMap: Map<string, TournamentTeam>;
   groupMap: Map<string, TournamentGroup>;
   groupIndexMap: Map<string, number>;
@@ -888,13 +919,21 @@ function CourtCard({
         )}
       </div>
 
-      {/* footer with next-up */}
-      {match && nextMatch && (
+      {/* footer — always rendered so all courts stay the same height */}
+      {match && blockingTeams && blockingTeams.length > 0 ? (
+        <WaitingFor blockingTeams={blockingTeams} playerMap={playerMap} />
+      ) : match && nextMatch ? (
         <NextUp
           match={nextMatch}
           teamMap={teamMap}
           playerMap={playerMap}
           accent={accent}
+        />
+      ) : (
+        <div
+          className="border-t border-transparent"
+          style={{ padding: "0.5vh 0" }}
+          aria-hidden="true"
         />
       )}
     </div>
@@ -1100,6 +1139,32 @@ function DoneState() {
       >
         Klar
       </div>
+    </div>
+  );
+}
+
+function WaitingFor({
+  blockingTeams,
+  playerMap,
+}: {
+  blockingTeams: TournamentTeam[];
+  playerMap: Map<string, Player>;
+}) {
+  const names = blockingTeams.map((t) => shortTeamName(t, playerMap)).join(" & ");
+  return (
+    <div className="relative border-t border-amber-200 px-[1vw] py-[0.5vh] flex items-center gap-2 bg-amber-50/60">
+      <span
+        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-black uppercase tracking-widest shrink-0 bg-amber-100 text-amber-700"
+        style={{ fontSize: "clamp(0.45rem, 0.6vw, 0.75rem)" }}
+      >
+        Väntar
+      </span>
+      <span
+        className="truncate font-semibold text-amber-800"
+        style={{ fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)" }}
+      >
+        {names}
+      </span>
     </div>
   );
 }

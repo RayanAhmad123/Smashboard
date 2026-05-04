@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentFormat } from "@/lib/supabase/types";
 import type { PlannedSessionStats } from "@/lib/db/tournaments";
 import {
   deleteTournament,
   setTournamentArchived,
+  duplicateTournamentAsDraft,
 } from "@/lib/db/tournaments";
 
 type Tab = "active" | "planned" | "draft" | "completed" | "archived";
@@ -35,6 +37,7 @@ export function DashboardClient({
   initialTournaments: Tournament[];
   initialPlannedStats: PlannedSessionStats[];
 }) {
+  const router = useRouter();
   const [tournaments, setTournaments] = useState(initialTournaments);
   const [tab, setTab] = useState<Tab>("active");
   const [busy, setBusy] = useState<string | null>(null);
@@ -91,6 +94,18 @@ export function DashboardClient({
     } catch (e) {
       setErr((e as Error).message);
     } finally {
+      setBusy(null);
+    }
+  }
+
+  async function duplicate(t: Tournament) {
+    setBusy(t.id);
+    setErr(null);
+    try {
+      const newT = await duplicateTournamentAsDraft(t.id, tenant.id);
+      router.push(`/${tenant.slug}/tournament/${newT.id}/plan`);
+    } catch (e) {
+      setErr((e as Error).message);
       setBusy(null);
     }
   }
@@ -181,6 +196,7 @@ export function DashboardClient({
                 plannedStats={statsMap.get(t.id)}
                 onArchive={(v) => archive(t, v)}
                 onDelete={() => destroy(t)}
+                onDuplicate={() => duplicate(t)}
               />
             ))}
           </ul>
@@ -210,6 +226,7 @@ function TournamentCard({
   plannedStats,
   onArchive,
   onDelete,
+  onDuplicate,
 }: {
   tournament: Tournament;
   tenantSlug: string;
@@ -218,6 +235,7 @@ function TournamentCard({
   plannedStats?: PlannedSessionStats;
   onArchive: (archived: boolean) => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const archived = !!tournament.archived_at;
   const isDraft = tournament.status === "draft" && !archived;
@@ -344,6 +362,15 @@ function TournamentCard({
           </>
         )}
         <div className="flex-1" />
+        {!isDraft && (
+          <button
+            onClick={onDuplicate}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
+          >
+            {busy ? "..." : "Duplicera"}
+          </button>
+        )}
         <button
           onClick={() => onArchive(!archived)}
           disabled={busy}

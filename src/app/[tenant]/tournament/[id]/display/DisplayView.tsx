@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import QRCode from "react-qr-code";
 import { supabaseClient } from "@/lib/supabase/client";
 import type {
   Tenant,
@@ -1426,6 +1427,12 @@ function Footer({
   tenant: Tenant;
   timeLabel: string;
 }) {
+  const [playUrl, setPlayUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlayUrl(`${window.location.origin}/${tenant.slug}/tournament/${tournament.id}/play`);
+  }, [tenant.slug, tournament.id]);
+
   return (
     <footer className="px-[2vw] py-[0.7vh] border-t border-zinc-200 flex items-center justify-between gap-3">
       <div
@@ -1440,11 +1447,25 @@ function Footer({
         <span className="text-zinc-300">·</span>
         <span className="tabular-nums">Uppdaterad {timeLabel}</span>
       </div>
-      <div
-        className="text-zinc-400 uppercase tracking-widest font-semibold"
-        style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
-      >
-        smashboard
+
+      <div className="flex items-center gap-[1.2vw] shrink-0">
+        {playUrl && (
+          <div className="flex items-center gap-[0.6vw]">
+            <div className="bg-white rounded p-[2px]" style={{ width: "clamp(28px, 3.2vw, 48px)", height: "clamp(28px, 3.2vw, 48px)" }}>
+              <QRCode value={playUrl} style={{ width: "100%", height: "100%" }} />
+            </div>
+            <div style={{ fontSize: "clamp(0.4rem, 0.55vw, 0.7rem)" }} className="text-zinc-400 leading-tight">
+              <p className="font-semibold text-zinc-500">Rapportera</p>
+              <p>Skanna &amp; välj ditt lag</p>
+            </div>
+          </div>
+        )}
+        <div
+          className="text-zinc-400 uppercase tracking-widest font-semibold"
+          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
+        >
+          smashboard
+        </div>
       </div>
     </footer>
   );

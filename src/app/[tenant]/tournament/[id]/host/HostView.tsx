@@ -893,7 +893,10 @@ function PlayoffPanel({
 
       {/* Group standings with advancing teams highlighted */}
       {isFirstRound && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div
+          className="mb-4 grid gap-3"
+          style={{ gridTemplateColumns: `repeat(${groupStandings.length}, minmax(0, 1fr))` }}
+        >
           {groupStandings.map((g, gi) => {
             const palette = groupPaletteFor(gi);
             return (

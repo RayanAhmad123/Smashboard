@@ -283,7 +283,11 @@ export function DisplayView({
             koMatches={computed.koMatches}
             activeKOStage={computed.activeKOStage}
             courts={data.courts}
+            byCourt={computed.byCourt}
+            nextByCourt={computed.nextByCourt}
             teamMap={computed.teamMap}
+            groupMap={computed.groupMap}
+            groupIndexMap={computed.groupIndexMap}
             playerMap={computed.playerMap}
             accent={accent}
           />
@@ -391,9 +395,6 @@ function RestingChip({
 // --- KO Bracket View ---
 // Left: bracket tree showing all stages. Right: active match cards (large).
 
-const KO_STAGE_ORDER = ["quarter_final", "semi_final", "final"] as const;
-type KOStage = typeof KO_STAGE_ORDER[number];
-
 const KO_STAGE_LABELS: Record<string, string> = {
   quarter_final: "Kvartsfinal",
   semi_final: "Semifinal",
@@ -405,121 +406,41 @@ function KOView({
   koMatches,
   activeKOStage,
   courts,
+  byCourt,
+  nextByCourt,
   teamMap,
+  groupMap,
+  groupIndexMap,
   playerMap,
   accent,
 }: {
   koMatches: TournamentMatch[];
   activeKOStage: string | null;
   courts: Court[];
+  byCourt: Map<string, TournamentMatch>;
+  nextByCourt: Map<string, TournamentMatch>;
   teamMap: Map<string, TournamentTeam>;
+  groupMap: Map<string, TournamentGroup>;
+  groupIndexMap: Map<string, number>;
   playerMap: Map<string, Player>;
   accent: string;
 }) {
-  const courtMap = useMemo(() => {
-    const m = new Map<string, Court>();
-    for (const c of courts) m.set(c.id, c);
-    return m;
-  }, [courts]);
-
-  const matchesByStage = useMemo(() => {
-    const m = new Map<string, TournamentMatch[]>();
-    for (const match of koMatches) {
-      const arr = m.get(match.stage) ?? [];
-      arr.push(match);
-      m.set(match.stage, arr);
-    }
-    return m;
-  }, [koMatches]);
-
-  const bronzeMatches = matchesByStage.get("bronze") ?? [];
-
-  // Stages that actually have matches
-  const presentStages = KO_STAGE_ORDER.filter((s) => matchesByStage.has(s));
-
-  // Active matches (incomplete and not bronze)
-  const activeMatches = koMatches.filter(
-    (m) => m.status !== "completed" && m.stage !== "bronze" && m.stage === activeKOStage
+  const koCourts = useMemo(
+    () => courts.filter((c) => koMatches.some((m) => m.court_id === c.id)),
+    [courts, koMatches]
   );
-  const activeBronze = bronzeMatches.filter((m) => m.status !== "completed");
 
-  const allActiveForDisplay = [...activeMatches, ...activeBronze];
+  const activeBronze = koMatches.filter(
+    (m) => m.stage === "bronze" && m.status !== "completed"
+  );
+
+  const displayCourts = koCourts.length > 0 ? koCourts : courts;
 
   return (
-    <div className="flex-1 min-h-0 flex gap-[1.5vw]">
-      {/* Bracket panel */}
-      <div className="w-[40vw] shrink-0 flex flex-col gap-[1vh]">
-        <div
-          className="font-black uppercase tracking-widest"
-          style={{ fontSize: "clamp(0.6rem, 0.85vw, 1rem)", color: accent }}
-        >
-          Slutspel
-        </div>
-        <div className="flex-1 min-h-0 flex gap-[1vw]">
-          {presentStages.map((stage) => {
-            const stageMatches = matchesByStage.get(stage) ?? [];
-            const isActive = stage === activeKOStage;
-            return (
-              <div key={stage} className="flex-1 flex flex-col gap-[1vh] justify-center">
-                <div
-                  className="font-black uppercase tracking-wider text-center"
-                  style={{
-                    fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)",
-                    color: isActive ? accent : "#71717a",
-                  }}
-                >
-                  {KO_STAGE_LABELS[stage]}
-                </div>
-                <div className="flex flex-col gap-[1.5vh] justify-center flex-1">
-                  {stageMatches.map((m) => (
-                    <BracketBox
-                      key={m.id}
-                      match={m}
-                      teamMap={teamMap}
-                      playerMap={playerMap}
-                      courtMap={courtMap}
-                      accent={accent}
-                      isActive={m.status !== "completed" && stage === activeKOStage}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {/* Bronze column if exists */}
-          {bronzeMatches.length > 0 && (
-            <div className="flex-1 flex flex-col gap-[1vh] justify-end">
-              <div
-                className="font-black uppercase tracking-wider text-center"
-                style={{
-                  fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)",
-                  color: activeBronze.length > 0 ? "#b45309" : "#71717a",
-                }}
-              >
-                Bronsmatch
-              </div>
-              <div className="flex flex-col gap-[1.5vh]">
-                {bronzeMatches.map((m) => (
-                  <BracketBox
-                    key={m.id}
-                    match={m}
-                    teamMap={teamMap}
-                    playerMap={playerMap}
-                    courtMap={courtMap}
-                    accent="#b45309"
-                    isActive={m.status !== "completed"}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Active match cards — large, TV-optimized */}
-      <div className="flex-1 min-w-0 flex flex-col gap-[1vh]">
-        {activeKOStage && (
-          <div className="flex items-center gap-[1vw]">
+    <div className="flex-1 min-h-0 flex flex-col gap-[1vh]">
+      {(activeKOStage || activeBronze.length > 0) && (
+        <div className="flex items-center gap-[1vw]">
+          {activeKOStage && (
             <span
               className="font-black uppercase tracking-widest px-[1vw] py-[0.4vh] rounded-full text-white"
               style={{
@@ -529,241 +450,31 @@ function KOView({
             >
               {KO_STAGE_LABELS[activeKOStage] ?? activeKOStage}
             </span>
-            {activeBronze.length > 0 && (
-              <span
-                className="font-black uppercase tracking-widest px-[1vw] py-[0.4vh] rounded-full text-white"
-                style={{
-                  backgroundColor: "#b45309",
-                  fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)",
-                }}
-              >
-                Bronsmatch
-              </span>
-            )}
-          </div>
-        )}
-        <div
-          className="flex-1 min-h-0 grid gap-[1vw]"
-          style={{
-            gridTemplateColumns: allActiveForDisplay.length > 2
-              ? "repeat(2, minmax(0,1fr))"
-              : "repeat(1, minmax(0,1fr))",
-            gridAutoRows: "1fr",
-          }}
-        >
-          {allActiveForDisplay.length === 0 ? (
-            <div className="flex items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300">
-              <span className="text-zinc-400 font-black" style={{ fontSize: "clamp(1.2rem, 2.5vw, 3rem)" }}>
-                Alla matcher klara
-              </span>
-            </div>
-          ) : (
-            allActiveForDisplay.map((m) => {
-              const t1 = teamMap.get(m.team1_id);
-              const t2 = teamMap.get(m.team2_id);
-              const court = m.court_id ? (courtMap.get(m.court_id) ?? null) : null;
-              const isBronze = m.stage === "bronze";
-              const isFinalMatch = m.stage === "final";
-              const stageColor = isFinalMatch ? "#d97706" : isBronze ? "#b45309" : accent;
-              return (
-                <KOMatchCard
-                  key={m.id}
-                  match={m}
-                  team1={t1 ?? null}
-                  team2={t2 ?? null}
-                  court={court}
-                  playerMap={playerMap}
-                  accent={stageColor}
-                />
-              );
-            })
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BracketBox({
-  match,
-  teamMap,
-  playerMap,
-  courtMap,
-  accent,
-  isActive,
-}: {
-  match: TournamentMatch;
-  teamMap: Map<string, TournamentTeam>;
-  playerMap: Map<string, Player>;
-  courtMap: Map<string, Court>;
-  accent: string;
-  isActive: boolean;
-}) {
-  const t1 = teamMap.get(match.team1_id);
-  const t2 = teamMap.get(match.team2_id);
-  const court = match.court_id ? (courtMap.get(match.court_id) ?? null) : null;
-  const done = match.status === "completed";
-  const t1Wins = done && (match.score_team1 ?? 0) > (match.score_team2 ?? 0);
-  const t2Wins = done && (match.score_team2 ?? 0) > (match.score_team1 ?? 0);
-
-  return (
-    <div
-      className="rounded-xl overflow-hidden"
-      style={{
-        border: isActive ? `2px solid ${accent}` : "1px solid #e4e4e7",
-        boxShadow: isActive ? `0 0 16px -4px ${accent}88` : undefined,
-        background: isActive ? `${accent}08` : "#fff",
-        opacity: done && !isActive ? 0.7 : 1,
-      }}
-    >
-      {court && (
-        <div
-          className="px-[0.6vw] py-[0.3vh] font-black uppercase tracking-wide text-center"
-          style={{
-            backgroundColor: `${accent}22`,
-            color: accent,
-            fontSize: "clamp(0.5rem, 0.65vw, 0.8rem)",
-          }}
-        >
-          {court.name}
-        </div>
-      )}
-      {[{ team: t1, score: match.score_team1, wins: t1Wins },
-        { team: t2, score: match.score_team2, wins: t2Wins }].map(({ team, score, wins }, idx) => (
-        <div
-          key={idx}
-          className="px-[0.6vw] py-[0.4vh] flex items-center justify-between gap-1"
-          style={{
-            borderTop: idx === 0 ? undefined : "1px solid #f4f4f5",
-            fontWeight: wins ? 900 : 500,
-            color: wins ? "#1a1a1a" : done && !wins ? "#a1a1aa" : "#3f3f46",
-          }}
-        >
-          <span
-            className="truncate min-w-0"
-            style={{ fontSize: "clamp(0.55rem, 0.8vw, 1rem)" }}
-          >
-            {team ? shortTeamName(team, playerMap) : "—"}
-          </span>
-          {done && score !== null && (
+          {activeBronze.length > 0 && (
             <span
-              className="shrink-0 tabular-nums font-black"
-              style={{ fontSize: "clamp(0.6rem, 0.85vw, 1rem)" }}
+              className="font-black uppercase tracking-widest px-[1vw] py-[0.4vh] rounded-full text-white"
+              style={{
+                backgroundColor: "#b45309",
+                fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)",
+              }}
             >
-              {score}
+              Bronsmatch
             </span>
           )}
         </div>
-      ))}
-    </div>
-  );
-}
-
-function KOMatchCard({
-  match,
-  team1,
-  team2,
-  court,
-  playerMap,
-  accent,
-}: {
-  match: TournamentMatch;
-  team1: TournamentTeam | null;
-  team2: TournamentTeam | null;
-  court: Court | null;
-  playerMap: Map<string, Player>;
-  accent: string;
-}) {
-  const p1a = team1 ? playerMap.get(team1.player1_id) : null;
-  const p1b = team1?.player2_id ? playerMap.get(team1.player2_id) : null;
-  const p2a = team2 ? playerMap.get(team2.player1_id) : null;
-  const p2b = team2?.player2_id ? playerMap.get(team2.player2_id) : null;
-
-  return (
-    <div
-      className="relative overflow-hidden rounded-2xl flex flex-col"
-      style={{
-        background: "#fff",
-        border: `2px solid ${accent}`,
-        boxShadow: `0 0 32px -8px ${accent}66, inset 0 0 0 1px ${accent}22`,
-      }}
-    >
-      {/* Stage + court header */}
-      <div
-        className="flex items-center justify-between px-[1.5vw] py-[0.8vh]"
-        style={{ backgroundColor: `${accent}15` }}
-      >
-        <span
-          className="font-black uppercase tracking-widest"
-          style={{ fontSize: "clamp(0.75rem, 1.2vw, 1.6rem)", color: accent }}
-        >
-          {KO_STAGE_LABELS[match.stage] ?? match.stage}
-        </span>
-        {court && (
-          <span
-            className="font-black px-[1vw] py-[0.3vh] rounded-full text-white"
-            style={{
-              backgroundColor: accent,
-              fontSize: "clamp(0.75rem, 1.2vw, 1.6rem)",
-            }}
-          >
-            {court.name}
-          </span>
-        )}
-      </div>
-
-      {/* Court SVG background */}
-      <div className="relative flex-1 min-h-0 flex items-center justify-center px-[2vw] py-[1vh]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/court-topdown.svg"
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-30"
+      )}
+      <div className="flex-1 min-h-0">
+        <MatchesView
+          courts={displayCourts}
+          byCourt={byCourt}
+          nextByCourt={nextByCourt}
+          teamMap={teamMap}
+          groupMap={groupMap}
+          groupIndexMap={groupIndexMap}
+          playerMap={playerMap}
+          accent={accent}
         />
-        <div className="relative w-full grid grid-cols-[1fr_auto_1fr] items-center gap-[1vw]">
-          {/* Team 1 */}
-          <div className="text-right min-w-0">
-            <div
-              className="font-black leading-tight truncate text-zinc-900"
-              style={{ fontSize: "clamp(1.2rem, 2.2vw, 3rem)" }}
-            >
-              {p1a?.name ?? "?"}
-            </div>
-            {p1b && (
-              <div
-                className="font-black leading-tight truncate text-zinc-900"
-                style={{ fontSize: "clamp(1.2rem, 2.2vw, 3rem)" }}
-              >
-                {p1b.name}
-              </div>
-            )}
-          </div>
-          {/* VS */}
-          <div
-            className="shrink-0 font-black text-zinc-400 uppercase"
-            style={{ fontSize: "clamp(0.8rem, 1.4vw, 1.8rem)" }}
-          >
-            vs
-          </div>
-          {/* Team 2 */}
-          <div className="text-left min-w-0">
-            <div
-              className="font-black leading-tight truncate text-zinc-900"
-              style={{ fontSize: "clamp(1.2rem, 2.2vw, 3rem)" }}
-            >
-              {p2a?.name ?? "?"}
-            </div>
-            {p2b && (
-              <div
-                className="font-black leading-tight truncate text-zinc-900"
-                style={{ fontSize: "clamp(1.2rem, 2.2vw, 3rem)" }}
-              >
-                {p2b.name}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

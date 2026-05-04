@@ -21,6 +21,7 @@ export function PaymentPanel({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<"unpaid" | "paid">("unpaid");
+  const [search, setSearch] = useState("");
 
   const unpaid = players.filter((p) => !p.paid);
   const paid = players.filter((p) => p.paid);
@@ -34,7 +35,11 @@ export function PaymentPanel({
     }
   }
 
-  const list = tab === "unpaid" ? unpaid : paid;
+  const query = search.trim().toLowerCase();
+  const baseList = tab === "unpaid" ? unpaid : paid;
+  const list = query
+    ? baseList.filter((p) => p.displayName.toLowerCase().includes(query))
+    : baseList;
 
   return (
     <div className="space-y-3">
@@ -43,6 +48,14 @@ export function PaymentPanel({
           {paid.length} av {players.length} har betalat
         </span>
       </div>
+
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Sök spelare…"
+        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+      />
 
       <div className="flex items-center gap-0 border-b border-zinc-200 dark:border-zinc-800">
         {(
@@ -68,7 +81,11 @@ export function PaymentPanel({
 
       {list.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-sm text-zinc-500">
-          {tab === "unpaid" ? "Alla har betalat!" : "Ingen har betalat ännu"}
+          {query
+            ? "Inga spelare matchar sökningen"
+            : tab === "unpaid"
+              ? "Alla har betalat!"
+              : "Ingen har betalat ännu"}
         </div>
       ) : (
         <ul className="space-y-2">

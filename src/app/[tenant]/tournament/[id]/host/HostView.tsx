@@ -252,10 +252,23 @@ function HostInner({
   }, [matchByCourt]);
   const roundTotal = matchByCourt.size;
 
-  // Sort courts so matches in the same group sit next to each other.
-  // Knockout matches (no group_id) and idle courts go last.
+  // Only courts that this tournament actually uses, sorted by group of first match.
+  const tournamentCourts = useMemo(() => {
+    const used = courts.filter((c) => matches.some((m) => m.court_id === c.id));
+    return used.sort((a, b) => {
+      const ma = matches.find((m) => m.court_id === a.id);
+      const mb = matches.find((m) => m.court_id === b.id);
+      const ga = ma?.group_id ? groupIndexMap.get(ma.group_id) ?? 9999 : 9999;
+      const gb = mb?.group_id ? groupIndexMap.get(mb.group_id) ?? 9999 : 9999;
+      if (ga !== gb) return ga - gb;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+  }, [courts, matches, groupIndexMap]);
+
+  // Sort tournamentCourts so matches in the same group sit next to each other for the
+  // current round (idle courts during group phase still appear in tournament-court order).
   const sortedCourts = useMemo(() => {
-    const decorated = courts.map((c, idx) => ({ court: c, idx }));
+    const decorated = tournamentCourts.map((c, idx) => ({ court: c, idx }));
     decorated.sort((a, b) => {
       const ma = matchByCourt.get(a.court.id);
       const mb = matchByCourt.get(b.court.id);
@@ -268,7 +281,7 @@ function HostInner({
       return a.idx - b.idx;
     });
     return decorated.map((d) => d.court);
-  }, [courts, matchByCourt, groupIndexMap]);
+  }, [tournamentCourts, matchByCourt, groupIndexMap]);
 
   // --- Playoff derived state ---
   const groupMatches = useMemo(() => matches.filter((m) => m.stage === "group"), [matches]);

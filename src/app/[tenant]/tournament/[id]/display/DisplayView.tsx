@@ -200,6 +200,21 @@ export function DisplayView({
     const groupMatches = data.matches.filter((m) => m.stage === "group");
     const hasKO = koMatches.length > 0;
 
+    // Only courts that this tournament actually uses, sorted by group
+    const tournamentCourts = (() => {
+      const used = data.courts.filter((c) =>
+        data.matches.some((m) => m.court_id === c.id)
+      );
+      return used.sort((a, b) => {
+        const ma = data.matches.find((m) => m.court_id === a.id);
+        const mb = data.matches.find((m) => m.court_id === b.id);
+        const ga = ma?.group_id ? groupIndexMap.get(ma.group_id) ?? 9999 : 9999;
+        const gb = mb?.group_id ? groupIndexMap.get(mb.group_id) ?? 9999 : 9999;
+        if (ga !== gb) return ga - gb;
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      });
+    })();
+
     // Current group round for resting teams
     const currentGroupRound = (() => {
       const incomplete = groupMatches.filter((m) => m.status !== "completed");
@@ -295,6 +310,7 @@ export function DisplayView({
       restingTeamIds,
       tournamentDone,
       finalRanking,
+      tournamentCourts,
     };
   }, [data]);
 
@@ -353,7 +369,7 @@ export function DisplayView({
           <KOView
             koMatches={computed.koMatches}
             activeKOStage={computed.activeKOStage}
-            courts={data.courts}
+            courts={computed.tournamentCourts}
             byCourt={computed.byCourt}
             nextByCourt={computed.nextByCourt}
             teamMap={computed.teamMap}
@@ -375,7 +391,7 @@ export function DisplayView({
               )}
               <div className="flex-1 min-h-0">
                 <MatchesView
-                  courts={data.courts}
+                  courts={computed.tournamentCourts}
                   byCourt={computed.byCourt}
                   nextByCourt={computed.nextByCourt}
                   teamMap={computed.teamMap}

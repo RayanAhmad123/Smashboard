@@ -472,6 +472,15 @@ function HostInner({
     });
   }, [groups, teams, groupMatches, playerMap, advancesPerGroup]);
 
+  const totalAdvancingKO = useMemo(
+    () => groupStandings.reduce((s, g) => s + g.standings.length, 0),
+    [groupStandings]
+  );
+  const firstKORoundNum = useMemo(
+    () => (koMatches.length > 0 ? Math.min(...koMatches.map((m) => m.round_number)) : null),
+    [koMatches]
+  );
+
   // Resting team for the current round (group phase)
   const restingTeamIdsThisRound = useMemo(() => {
     // Collect every round number currently shown on a court. With session-based
@@ -486,6 +495,15 @@ function HostInner({
       .filter((r) => displayedRounds.has(r.round_number))
       .map((r) => r.team_id);
   }, [rests, matchByCourt]);
+
+  // Play-in matches have stage "quarter_final" but should be labeled "Inledningsrunda"
+  // when they are in the first KO round and there were more than 8 advancing teams.
+  function matchDisplayStageLabel(m: TournamentMatch): string {
+    if (m.stage === "quarter_final" && totalAdvancingKO > 8 && m.round_number === firstKORoundNum) {
+      return "Inledningsrunda";
+    }
+    return stageLabel(m, groupMap);
+  }
 
   // Automatically generates the next KO round's match for each completed pair
   // of feeder matches, enabling QF and SF to run simultaneously.
@@ -759,7 +777,7 @@ function HostInner({
                               key={m.id} match={m}
                               team1={teamMap.get(m.team1_id)!} team2={teamMap.get(m.team2_id)!}
                               playerMap={playerMap} courtName={c.name}
-                              stage={stageLabel(m, groupMap)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                              stage={matchDisplayStageLabel(m)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
                               blockingTeams={blocking}
                             />
                           );
@@ -769,7 +787,7 @@ function HostInner({
                             key={m.id} match={m}
                             team1={teamMap.get(m.team1_id)!} team2={teamMap.get(m.team2_id)!}
                             playerMap={playerMap} courtName={c.name}
-                            stage={stageLabel(m, groupMap)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                            stage={matchDisplayStageLabel(m)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
                             onSave={(s1, s2) => saveScore(m, s1, s2)}
                             busy={busy === m.id} gamesPerMatch={tournament.games_per_match}
                           />
@@ -804,7 +822,7 @@ function HostInner({
                     team2={teamMap.get(m.team2_id)!}
                     playerMap={playerMap}
                     courtName={c.name}
-                    stage={stageLabel(m, groupMap)}
+                    stage={matchDisplayStageLabel(m)}
                     badgeClass={badgeClassForMatch(m, groupIndexMap)}
                     blockingTeams={blocking}
                   />
@@ -818,7 +836,7 @@ function HostInner({
                   team2={teamMap.get(m.team2_id)!}
                   playerMap={playerMap}
                   courtName={c.name}
-                  stage={stageLabel(m, groupMap)}
+                  stage={matchDisplayStageLabel(m)}
                   badgeClass={badgeClassForMatch(m, groupIndexMap)}
                   onSave={(s1, s2) => saveScore(m, s1, s2)}
                   busy={busy === m.id}
@@ -1313,8 +1331,8 @@ function computeBracketPath(totalAdvancing: number, hasBronze: boolean): Bracket
     steps.push({ label: "Kvartsfinal", matchCount: 4, isNow: false });
     steps.push({ label: "Semifinal", matchCount: 2, isNow: false });
   } else if (totalAdvancing > 4) {
-    // Some teams may get byes to SF, remaining play QF
-    const qfMatches = Math.floor(totalAdvancing / 2);
+    // Top (8 - n) seeds get internal byes; the remaining (n - 4) pairs play QF.
+    const qfMatches = totalAdvancing - 4;
     steps.push({ label: "Kvartsfinal", matchCount: qfMatches, isNow: true });
     steps.push({ label: "Semifinal", matchCount: 2, isNow: false });
   } else if (totalAdvancing > 2) {

@@ -380,7 +380,7 @@ export function DisplayView({
           />
         ) : (
           <>
-            <div className="flex-1 min-w-0 flex flex-col gap-[1vw]">
+            <div className="flex-1 min-w-0 flex flex-col gap-[1.5vh]">
               {computed.restingTeamIds.length > 0 && (
                 <RestingChip
                   teamIds={computed.restingTeamIds}
@@ -1156,13 +1156,23 @@ function StandingsColumn({
   playerMap: Map<string, Player>;
   accent: string;
 }) {
+  // Count total rows to auto-scale font size so everything fits
+  const totalTeamRows = groups.reduce((sum, g) => {
+    const gt = teams.filter((t) => t.group_id === g.id);
+    const gm = matches.filter((m) => m.group_id === g.id);
+    return sum + Math.max(computeStandings(gt, gm, playerMap).length, 1);
+  }, 0);
+  const totalRows = totalTeamRows + groups.length; // team rows + group headers
+  // Scale: ≤20 rows → 1x, 21-30 → 0.88x, >30 → 0.76x
+  const scale = totalRows <= 20 ? 1 : totalRows <= 30 ? 0.88 : 0.76;
+
   return (
     <div
       className="h-full rounded-2xl overflow-hidden flex flex-col border border-zinc-200 bg-white"
       style={{ boxShadow: "0 4px 18px -10px rgba(0,0,0,0.18)" }}
     >
       <div
-        className="px-[0.8vw] py-[0.7vh] flex items-center justify-between border-b border-zinc-200"
+        className="px-[0.8vw] py-[0.6vh] flex items-center justify-between border-b border-zinc-200 shrink-0"
         style={{ backgroundColor: `${accent}15` }}
       >
         <div
@@ -1182,7 +1192,7 @@ function StandingsColumn({
           # · LAG · GD
         </div>
       </div>
-      <div className="flex-1 min-h-0 flex flex-col divide-y divide-zinc-200 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-zinc-200">
         {groups.map((g, gi) => {
           const groupTeams = teams.filter((t) => t.group_id === g.id);
           const groupMatches = matches.filter((m) => m.group_id === g.id);
@@ -1190,19 +1200,16 @@ function StandingsColumn({
           const teamById = new Map(groupTeams.map((t) => [t.id, t]));
           const palette = groupPaletteFor(gi);
           return (
-            <div
-              key={g.id}
-              className="flex-1 min-h-0 flex flex-col overflow-hidden"
-            >
+            <div key={g.id} className="shrink-0">
               <div
-                className={`px-[0.8vw] py-[0.3vh] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
-                style={{ fontSize: "clamp(0.6rem, 0.8vw, 0.95rem)" }}
+                className={`px-[0.8vw] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
+                style={{
+                  fontSize: `clamp(0.5rem, ${0.72 * scale}vw, ${0.88 * scale}rem)`,
+                  padding: `${0.22 * scale}vh 0.8vw`,
+                }}
               >
                 <span>{g.name}</span>
-                <span
-                  className="opacity-60 tabular-nums font-semibold"
-                  style={{ fontSize: "clamp(0.5rem, 0.6vw, 0.75rem)" }}
-                >
+                <span className="opacity-60 tabular-nums font-semibold" style={{ fontSize: `clamp(0.45rem, ${0.58 * scale}vw, ${0.72 * scale}rem)` }}>
                   {standings.length}
                 </span>
               </div>
@@ -1212,17 +1219,17 @@ function StandingsColumn({
                   return (
                     <li
                       key={s.team_id}
-                      className="px-[0.8vw] py-[0.3vh] flex items-center gap-2 border-t border-zinc-100"
-                      style={{ fontSize: "clamp(0.6rem, 0.78vw, 0.92rem)" }}
+                      className="px-[0.8vw] flex items-center gap-[0.4vw] border-t border-zinc-100"
+                      style={{
+                        fontSize: `clamp(0.5rem, ${0.7 * scale}vw, ${0.86 * scale}rem)`,
+                        padding: `${0.18 * scale}vh 0.8vw`,
+                      }}
                     >
                       <span
-                        className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.6em] h-[1.6em] font-black tabular-nums"
+                        className="shrink-0 inline-flex items-center justify-center rounded-full w-[1.5em] h-[1.5em] font-black tabular-nums"
                         style={
                           top
-                            ? {
-                                backgroundColor: `${accent}25`,
-                                color: accent,
-                              }
+                            ? { backgroundColor: `${accent}25`, color: accent }
                             : { color: "#a1a1aa" }
                         }
                       >
@@ -1254,8 +1261,8 @@ function StandingsColumn({
                 })}
                 {standings.length === 0 && (
                   <li
-                    className="px-[0.8vw] py-[0.6vh] flex items-center justify-center text-zinc-400"
-                    style={{ fontSize: "clamp(0.65rem, 0.85vw, 0.95rem)" }}
+                    className="px-[0.8vw] py-[0.5vh] flex items-center justify-center text-zinc-400"
+                    style={{ fontSize: `clamp(0.5rem, ${0.7 * scale}vw, 0.88rem)` }}
                   >
                     Inga lag
                   </li>

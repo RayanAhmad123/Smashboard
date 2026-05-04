@@ -1192,7 +1192,7 @@ function StandingsColumn({
           # · LAG · GD
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-zinc-200">
+      <div className="flex-1 min-h-0 flex flex-col divide-y divide-zinc-200 overflow-y-auto">
         {groups.map((g, gi) => {
           const groupTeams = teams.filter((t) => t.group_id === g.id);
           const groupMatches = matches.filter((m) => m.group_id === g.id);
@@ -1200,7 +1200,7 @@ function StandingsColumn({
           const teamById = new Map(groupTeams.map((t) => [t.id, t]));
           const palette = groupPaletteFor(gi);
           return (
-            <div key={g.id} className="shrink-0">
+            <div key={g.id} className="flex-1 min-h-fit flex flex-col">
               <div
                 className={`px-[0.8vw] font-bold tracking-tight flex items-center justify-between ${palette.bar}`}
                 style={{

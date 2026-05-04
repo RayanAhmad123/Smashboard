@@ -280,7 +280,10 @@ function HostInner({
   const tournamentPhase = useMemo((): TournamentPhase => {
     if (!allGroupDone) return "group_active";
     if (!hasKO && advancesPerGroup > 0) return "ready_for_playoff";
-    if (hasKO && koMatches.some((m) => m.status !== "completed")) return "ko_active";
+    if (hasKO) {
+      const finalDone = koMatches.some((m) => m.stage === "final" && m.status === "completed");
+      return finalDone ? "done" : "ko_active";
+    }
     return "done";
   }, [allGroupDone, hasKO, advancesPerGroup, koMatches]);
 

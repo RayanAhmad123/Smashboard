@@ -77,7 +77,7 @@ function buildFinalMatches(
   tournamentId: string,
   hasBronze: boolean
 ): GeneratedKOMatch[] {
-  const seeds = collectSeeds(groupStandings, 1);
+  const seeds = collectSeeds(groupStandings, Math.max(...groupStandings.map((g) => g.standings.length)));
   if (seeds.length < 2) return [];
   const court = courts[0] ?? null;
   return [makeMatch(tournamentId, seeds[0].team_id, seeds[1].team_id, "final", court, 1)];

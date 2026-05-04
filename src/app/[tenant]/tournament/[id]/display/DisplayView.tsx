@@ -217,6 +217,68 @@ export function DisplayView({
     );
     const activeKOStage = activeKOMatches.length > 0 ? activeKOMatches[0].stage : null;
 
+    // Tournament fully done: a final exists and every match is completed
+    const finalMatches = koMatches.filter((m) => m.stage === "final");
+    const tournamentDone =
+      data.matches.length > 0 &&
+      data.matches.every((m) => m.status === "completed") &&
+      finalMatches.length > 0;
+
+    let finalRanking: { teamId: string; place: number }[] = [];
+    if (tournamentDone) {
+      const winnerOf = new Map<string, string>();
+      const loserOf = new Map<string, string>();
+      for (const m of koMatches) {
+        if (m.status !== "completed") continue;
+        const t1Win = (m.score_team1 ?? 0) > (m.score_team2 ?? 0);
+        winnerOf.set(m.id, t1Win ? m.team1_id : m.team2_id);
+        loserOf.set(m.id, t1Win ? m.team2_id : m.team1_id);
+      }
+
+      const placed: { teamId: string; place: number }[] = [];
+      const placedIds = new Set<string>();
+
+      const finalMatch = finalMatches[0];
+      const finalWinner = winnerOf.get(finalMatch.id);
+      const finalLoser = loserOf.get(finalMatch.id);
+      if (finalWinner) {
+        placed.push({ teamId: finalWinner, place: 1 });
+        placedIds.add(finalWinner);
+      }
+      if (finalLoser) {
+        placed.push({ teamId: finalLoser, place: 2 });
+        placedIds.add(finalLoser);
+      }
+
+      const bronzeMatch = koMatches.find(
+        (m) => m.stage === "bronze" && m.status === "completed"
+      );
+      if (bronzeMatch) {
+        const bw = winnerOf.get(bronzeMatch.id);
+        const bl = loserOf.get(bronzeMatch.id);
+        if (bw && !placedIds.has(bw)) {
+          placed.push({ teamId: bw, place: 3 });
+          placedIds.add(bw);
+        }
+        if (bl && !placedIds.has(bl)) {
+          placed.push({ teamId: bl, place: 4 });
+          placedIds.add(bl);
+        }
+      }
+
+      // Remaining teams: sort by overall stats (group + KO)
+      const allCompleted = data.matches.filter((m) => m.status === "completed");
+      const overall = computeStandings(data.teams, allCompleted, playerMap);
+      let nextPlace = placed.length + 1;
+      for (const s of overall) {
+        if (placedIds.has(s.team_id)) continue;
+        placed.push({ teamId: s.team_id, place: nextPlace++ });
+        placedIds.add(s.team_id);
+      }
+
+      finalRanking = placed;
+    }
+
     return {
       playerMap,
       teamMap,
@@ -231,6 +293,8 @@ export function DisplayView({
       hasKO,
       activeKOStage,
       restingTeamIds,
+      tournamentDone,
+      finalRanking,
     };
   }, [data]);
 
@@ -278,7 +342,14 @@ export function DisplayView({
       />
 
       <main className="flex-1 min-h-0 px-[1.5vw] py-[1vh] flex gap-[1vw]">
-        {computed.hasKO ? (
+        {computed.tournamentDone ? (
+          <PodiumView
+            ranking={computed.finalRanking}
+            teamMap={computed.teamMap}
+            playerMap={computed.playerMap}
+            accent={accent}
+          />
+        ) : computed.hasKO ? (
           <KOView
             koMatches={computed.koMatches}
             activeKOStage={computed.activeKOStage}
@@ -846,6 +917,151 @@ function TeamBlock({
         }}
       >
         {shortName(p2)}
+      </div>
+    </div>
+  );
+}
+
+function PodiumView({
+  ranking,
+  teamMap,
+  playerMap,
+  accent,
+}: {
+  ranking: { teamId: string; place: number }[];
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  accent: string;
+}) {
+  const top3 = [1, 2, 3].map((p) => ranking.find((r) => r.place === p) ?? null);
+  const rest = ranking.filter((r) => r.place > 3);
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-[2vh]">
+      <div className="flex items-end justify-center gap-[1.5vw] px-[4vw]" style={{ height: "55%" }}>
+        <PodiumPillar
+          place={2}
+          entry={top3[1]}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          color="#94a3b8"
+          heightPct={70}
+        />
+        <PodiumPillar
+          place={1}
+          entry={top3[0]}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          color={accent}
+          heightPct={100}
+          gold
+        />
+        <PodiumPillar
+          place={3}
+          entry={top3[2]}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          color="#b45309"
+          heightPct={50}
+        />
+      </div>
+      {rest.length > 0 && (
+        <div className="flex-1 min-h-0 overflow-hidden px-[2vw]">
+          <div
+            className="grid gap-x-[3vw] gap-y-[0.6vh] content-start"
+            style={{
+              gridTemplateColumns: `repeat(${rest.length > 8 ? 3 : 2}, minmax(0, 1fr))`,
+            }}
+          >
+            {rest.map((r) => {
+              const t = teamMap.get(r.teamId);
+              const p1 = t ? playerMap.get(t.player1_id) : null;
+              const p2 = t && t.player2_id ? playerMap.get(t.player2_id) : null;
+              return (
+                <div
+                  key={r.teamId}
+                  className="flex items-baseline gap-[1vw] border-b border-zinc-200 pb-[0.4vh]"
+                >
+                  <span
+                    className="font-bold tabular-nums text-zinc-400 shrink-0 w-[3ch] text-right"
+                    style={{ fontSize: "clamp(0.7rem, 1.1vw, 1.5rem)" }}
+                  >
+                    {r.place}.
+                  </span>
+                  <span
+                    className="font-medium text-zinc-800 truncate"
+                    style={{ fontSize: "clamp(0.7rem, 1.1vw, 1.5rem)" }}
+                  >
+                    {p1 ? shortName(p1) : "?"}{p2 ? ` & ${shortName(p2)}` : ""}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PodiumPillar({
+  place,
+  entry,
+  teamMap,
+  playerMap,
+  color,
+  heightPct,
+  gold,
+}: {
+  place: number;
+  entry: { teamId: string; place: number } | null;
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  color: string;
+  heightPct: number;
+  gold?: boolean;
+}) {
+  const t = entry ? teamMap.get(entry.teamId) : null;
+  const p1 = t ? playerMap.get(t.player1_id) : null;
+  const p2 = t && t.player2_id ? playerMap.get(t.player2_id) : null;
+  return (
+    <div className="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-[1vh]">
+      <div className="text-center min-w-0 w-full px-[0.5vw]">
+        <div
+          className="font-bold leading-tight truncate"
+          style={{
+            fontSize: gold ? "clamp(1rem, 2.2vw, 3rem)" : "clamp(0.85rem, 1.6vw, 2.2rem)",
+            color: gold ? color : "#1f2937",
+          }}
+        >
+          {p1 ? shortName(p1) : "—"}
+        </div>
+        {p2 && (
+          <div
+            className="font-bold leading-tight truncate"
+            style={{
+              fontSize: gold ? "clamp(1rem, 2.2vw, 3rem)" : "clamp(0.85rem, 1.6vw, 2.2rem)",
+              color: gold ? color : "#1f2937",
+            }}
+          >
+            {shortName(p2)}
+          </div>
+        )}
+      </div>
+      <div
+        className="w-full rounded-t-2xl flex items-start justify-center pt-[1.5vh]"
+        style={{
+          height: `${heightPct}%`,
+          background: `linear-gradient(180deg, ${color} 0%, ${color}cc 100%)`,
+          boxShadow: gold ? `0 0 40px -8px ${color}` : undefined,
+        }}
+      >
+        <div
+          className="font-black text-white"
+          style={{ fontSize: gold ? "clamp(2rem, 6vw, 8rem)" : "clamp(1.5rem, 4.5vw, 6rem)" }}
+        >
+          {place}
+        </div>
       </div>
     </div>
   );

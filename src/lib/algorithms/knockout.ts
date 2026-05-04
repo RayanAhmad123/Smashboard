@@ -167,20 +167,17 @@ function buildQFMatches(
   return matches;
 }
 
-// Given completed KO matches from the current stage, generate the next round.
-// Winners advance; if hasBronze, the two SF losers get a bronze match.
+// Given completed KO matches from the current round and any teams that had
+// byes (advanced without playing this round), generate the next round.
+// Bye teams + winners are cross-paired (top seed vs lowest survivor).
+// If hasBronze and we're going from 2 semis to the Final, generate bronze.
 export function generateNextKORound(
   completedMatches: TournamentMatch[],
+  byeTeamIds: string[],
   courts: Court[],
   tournamentId: string,
   hasBronze: boolean
 ): GeneratedKOMatch[] {
-  const currentStage = completedMatches[0]?.stage;
-  if (!currentStage) return [];
-
-  const stage = nextStage(currentStage);
-  if (!stage) return [];
-
   const winners = completedMatches.map((m) => {
     const t1Wins = (m.score_team1 ?? 0) > (m.score_team2 ?? 0);
     return t1Wins ? m.team1_id : m.team2_id;
@@ -190,18 +187,26 @@ export function generateNextKORound(
     return t1Wins ? m.team2_id : m.team1_id;
   });
 
+  // Bye teams advanced as top seeds; winners are seeded below them.
+  const entrants = [...byeTeamIds, ...winners];
+  const n = entrants.length;
+  if (n < 2) return [];
+
+  // Stage from entrant count, not previous label — handles play-in rounds
+  // (e.g. 9-16 advancing teams) correctly.
+  const stage: MatchStage = n === 2 ? "final" : n <= 4 ? "semi_final" : "quarter_final";
+
   const matches: GeneratedKOMatch[] = [];
   const roundNumber = (completedMatches[0]?.round_number ?? 0) + 1;
 
-  // Pair winners: match 0 winner vs match 1 winner, etc.
-  for (let i = 0; i < winners.length - 1; i += 2) {
-    const matchIdx = i / 2;
-    const court = courts[matchIdx % courts.length] ?? null;
-    matches.push(makeMatch(tournamentId, winners[i], winners[i + 1], stage, court, roundNumber));
+  // Cross-pair: entrant[0] vs entrant[n-1], entrant[1] vs entrant[n-2], …
+  for (let i = 0; i < Math.floor(n / 2); i++) {
+    const court = courts[i % courts.length] ?? null;
+    matches.push(makeMatch(tournamentId, entrants[i], entrants[n - 1 - i], stage, court, roundNumber));
   }
 
-  // Bronze match from SF losers
-  if (hasBronze && currentStage === "semi_final" && losers.length >= 2) {
+  // Bronze: only when going from exactly 2 semi-final matches to the Final.
+  if (hasBronze && stage === "final" && completedMatches.length === 2 && losers.length >= 2) {
     const bronzeCourt = courts[Math.floor(courts.length / 2)] ?? courts[0] ?? null;
     matches.push(makeMatch(tournamentId, losers[0], losers[1], "bronze", bronzeCourt, roundNumber));
   }

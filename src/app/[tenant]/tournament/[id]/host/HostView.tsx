@@ -11,7 +11,6 @@ import type {
   TournamentGroup,
   Court,
   Player,
-  MatchStage,
 } from "@/lib/supabase/types";
 import { updateMatchScore } from "@/lib/db/matches";
 import { setPlayerPaid, insertMatches, getRoundRests } from "@/lib/db/tournaments";
@@ -26,8 +25,6 @@ import {
   generateFirstKORound,
   generateNextKORound,
   byeCount,
-  firstKOStage,
-  nextStage,
   type GroupStanding,
 } from "@/lib/algorithms/knockout";
 import type { RoundRest } from "@/lib/supabase/types";
@@ -401,25 +398,43 @@ function HostInner({
     return null;
   }, [koMatches]);
 
-  // The most recently completed KO stage (ignoring bronze)
-  const lastCompletedKOStage = useMemo(() => {
+  // Round-number based: the most recently completed non-bronze KO round.
+  // Stage labels can repeat across rounds (e.g. play-in QF then real QF for
+  // 9+ team brackets), so we key by round_number, not stage.
+  const lastCompletedKORound = useMemo(() => {
     const complete = koMatches.filter((m) => m.status === "completed" && m.stage !== "bronze");
     if (complete.length === 0) return null;
-    // Return the stage of the last completed non-bronze round
-    const stages = ["quarter_final", "semi_final", "final"] as const;
-    for (let i = stages.length - 1; i >= 0; i--) {
-      if (complete.some((m) => m.stage === stages[i])) return stages[i];
-    }
-    return null;
+    return Math.max(...complete.map((m) => m.round_number));
   }, [koMatches]);
 
-  // Whether the current KO stage is fully done and there's a next stage to generate
+  // Bye teams for the next KO round: advancing teams that haven't yet played
+  // any KO match. Includes top seeds that skipped the first KO round and
+  // any subsequent-round byes (rare but possible with odd brackets).
+  const byeTeamIdsForNextRound = useMemo(() => {
+    if (advancesPerGroup === 0) return [];
+    const advancingIds = new Set<string>();
+    for (const g of groups) {
+      const groupTeams = teams.filter((t) => t.group_id === g.id);
+      const groupMatchesForGroup = groupMatches.filter((m) => m.group_id === g.id);
+      const standings = computeStandings(groupTeams, groupMatchesForGroup, playerMap).slice(0, advancesPerGroup);
+      for (const s of standings) advancingIds.add(s.team_id);
+    }
+    const playedInKO = new Set<string>();
+    for (const m of koMatches) {
+      playedInKO.add(m.team1_id);
+      playedInKO.add(m.team2_id);
+    }
+    return [...advancingIds].filter((id) => !playedInKO.has(id));
+  }, [groups, teams, groupMatches, playerMap, advancesPerGroup, koMatches]);
+
+  // Ready to advance when: KO is in progress, no incomplete non-bronze
+  // matches, and the final hasn't been played yet (tournamentPhase handles
+  // the "done" case).
   const koRoundReadyToAdvance = useMemo(() => {
     if (tournamentPhase !== "ko_active") return false;
     if (activeKOStage !== null) return false; // still in progress
-    if (!lastCompletedKOStage) return false;
-    return nextStage(lastCompletedKOStage) !== null;
-  }, [tournamentPhase, activeKOStage, lastCompletedKOStage]);
+    return koMatches.length > 0;
+  }, [tournamentPhase, activeKOStage, koMatches]);
 
   // Group standings for playoff panel
   const groupStandings = useMemo((): GroupStanding[] => {
@@ -524,7 +539,8 @@ function HostInner({
           koMatches={koMatches}
           courts={courts}
           accent={accent}
-          lastCompletedKOStage={lastCompletedKOStage}
+          lastCompletedKORound={lastCompletedKORound}
+          byeTeamIds={byeTeamIdsForNextRound}
           teamMap={teamMap}
           playerMap={playerMap}
           onGenerated={reload}
@@ -771,7 +787,8 @@ function PlayoffPanel({
   koMatches,
   courts,
   accent,
-  lastCompletedKOStage,
+  lastCompletedKORound,
+  byeTeamIds,
   teamMap,
   playerMap,
   onGenerated,
@@ -781,13 +798,13 @@ function PlayoffPanel({
   koMatches: TournamentMatch[];
   courts: Court[];
   accent: string;
-  lastCompletedKOStage: string | null;
+  lastCompletedKORound: number | null;
+  byeTeamIds: string[];
   teamMap: Map<string, TournamentTeam>;
   playerMap: Map<string, Player>;
   onGenerated: () => Promise<void>;
 }) {
   const isFirstRound = koMatches.length === 0;
-  const advancesPerGroup = tournament.advances_per_group ?? 0;
   const hasBronze = tournament.has_bronze;
 
   const byes = byeCount(groupStandings);
@@ -806,18 +823,31 @@ function PlayoffPanel({
     );
   }, [isFirstRound, groupStandings, byeGroupIds, tournament.id, hasBronze]);
 
-  const recommendedCount = useMemo(() => {
-    if (isFirstRound) {
-      const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
-      return Math.floor((totalAdvancing - byes) / 2);
-    }
-    const completedStageMatches = koMatches.filter(
-      (m) => m.stage === lastCompletedKOStage && m.status === "completed"
+  // Matches completed in the most recent KO round (used to feed generateNextKORound).
+  const completedRoundMatches = useMemo(() => {
+    if (isFirstRound || lastCompletedKORound === null) return [];
+    return koMatches.filter(
+      (m) => m.round_number === lastCompletedKORound && m.status === "completed" && m.stage !== "bronze"
     );
-    const matchCount = Math.ceil(completedStageMatches.length / 2);
-    const bronzeCount = hasBronze && nextStage(lastCompletedKOStage as MatchStage) === "final" ? 1 : 0;
+  }, [isFirstRound, koMatches, lastCompletedKORound]);
+
+  // Number of entrants in the round we're about to generate. Each match takes 2.
+  const nextRoundEntrants = useMemo(() => {
+    if (isFirstRound) {
+      // First round entrants are computed inside generateFirstKORound; use preview length × 2.
+      return previewMatchups.length * 2;
+    }
+    return completedRoundMatches.length + byeTeamIds.length;
+  }, [isFirstRound, previewMatchups, completedRoundMatches, byeTeamIds]);
+
+  const recommendedCount = useMemo(() => {
+    if (isFirstRound) return previewMatchups.length;
+    const matchCount = Math.floor(nextRoundEntrants / 2);
+    // Bronze is only generated when we're going from 2 semis to a Final.
+    const goingToFinal = nextRoundEntrants === 2;
+    const bronzeCount = hasBronze && goingToFinal && completedRoundMatches.length === 2 ? 1 : 0;
     return matchCount + bronzeCount;
-  }, [isFirstRound, groupStandings, byes, koMatches, lastCompletedKOStage, hasBronze]);
+  }, [isFirstRound, previewMatchups, nextRoundEntrants, completedRoundMatches, hasBronze]);
 
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
     () => new Set(courts.slice(0, recommendedCount).map((c) => c.id))
@@ -831,7 +861,7 @@ function PlayoffPanel({
 
   const stageLabel = isFirstRound
     ? firstKOStageLabel(groupStandings.reduce((s, g) => s + g.standings.length, 0))
-    : nextStageLabel(lastCompletedKOStage);
+    : stageLabelForEntrants(nextRoundEntrants);
 
   async function generate() {
     if (!canGenerate) return;
@@ -848,11 +878,9 @@ function PlayoffPanel({
           hasBronze
         );
       } else {
-        const completedStageMatches = koMatches.filter(
-          (m) => m.stage === lastCompletedKOStage && m.status === "completed"
-        );
         newMatches = generateNextKORound(
-          completedStageMatches,
+          completedRoundMatches,
+          byeTeamIds,
           chosenCourts,
           tournament.id,
           hasBronze
@@ -948,7 +976,7 @@ function PlayoffPanel({
       {isFirstRound && byes > 0 && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-3">
           <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2">
-            {byes} frival till {nextStageLabel(firstKOStageLabel(groupStandings.reduce((s, g) => s + g.standings.length, 0)))} — välj vilka grupper:
+            {byes} frival — välj vilka grupper:
           </p>
           <div className="flex flex-wrap gap-2">
             {groupStandings.map((g) => {
@@ -1044,12 +1072,10 @@ function firstKOStageLabel(total: number): string {
   return "Kvartsfinal";
 }
 
-function nextStageLabel(current: string | null): string {
-  switch (current) {
-    case "quarter_final": return "Semifinal";
-    case "semi_final": return "Final";
-    default: return "Nästa runda";
-  }
+function stageLabelForEntrants(n: number): string {
+  if (n === 2) return "Final";
+  if (n <= 4) return "Semifinal";
+  return "Kvartsfinal";
 }
 
 function MatchCard({

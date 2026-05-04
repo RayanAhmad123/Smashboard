@@ -48,7 +48,8 @@ export function shortName(player: Player | undefined | null): string {
   if (parts.length === 1) return parts[0];
   const first = parts[0];
   const last = parts[parts.length - 1];
-  return `${first} ${last.charAt(0).toUpperCase()}.`;
+  const abbr = last.length > 3 ? last.slice(0, 3) + "." : last;
+  return `${first} ${abbr}`;
 }
 
 export function shortTeamName(

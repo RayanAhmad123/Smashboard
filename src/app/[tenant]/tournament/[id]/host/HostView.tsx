@@ -645,6 +645,17 @@ function PlayoffPanel({
   const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const previewMatchups = useMemo(() => {
+    if (!isFirstRound) return [];
+    return generateFirstKORound(
+      groupStandings,
+      Array.from(byeGroupIds),
+      [],
+      tournament.id,
+      hasBronze
+    );
+  }, [isFirstRound, groupStandings, byeGroupIds, tournament.id, hasBronze]);
+
   const recommendedCount = useMemo(() => {
     if (isFirstRound) {
       const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
@@ -755,6 +766,29 @@ function PlayoffPanel({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Bracket preview */}
+      {isFirstRound && previewMatchups.length > 0 && (
+        <div className="mb-4 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+          <div className="px-3 py-1.5 text-xs font-semibold bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+            Förhandsvisning av matchningar
+          </div>
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {previewMatchups.map((m, i) => {
+              const t1 = teamMap.get(m.team1_id);
+              const t2 = teamMap.get(m.team2_id);
+              return (
+                <div key={i} className="px-3 py-1.5 flex items-center gap-2 text-xs">
+                  <span className="text-zinc-400 w-4 shrink-0">{i + 1}</span>
+                  <span className="font-medium truncate">{t1 ? shortTeamName(t1, playerMap) : "?"}</span>
+                  <span className="text-zinc-400 shrink-0">vs</span>
+                  <span className="font-medium truncate">{t2 ? shortTeamName(t2, playerMap) : "?"}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -545,7 +545,10 @@ function HostInner({
     for (const roundNum of allKORounds) {
       const roundMatches = koAll
         .filter((m) => m.round_number === roundNum && m.stage !== "bronze")
-        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+        .sort((a, b) => {
+          const dt = a.created_at.localeCompare(b.created_at);
+          return dt !== 0 ? dt : a.id.localeCompare(b.id);
+        });
       const nextRound = roundNum + 1;
       const nextRoundMatches = koAll.filter(
         (m) => m.round_number === nextRound && m.stage !== "bronze"
@@ -1339,7 +1342,7 @@ function computeBracketPath(totalAdvancing: number, hasBronze: boolean): Bracket
     const sfMatches = Math.floor(totalAdvancing / 2);
     const isPlayIn = totalAdvancing === 3;
     steps.push({ label: isPlayIn ? "Inledningsrunda" : "Semifinal", matchCount: sfMatches, isNow: true });
-    if (isPlayIn) steps.push({ label: "Final", matchCount: 1, isNow: false });
+    // Final is added by the unconditional push below — don't push it here.
   }
 
   steps.push({ label: "Final", matchCount: 1, isNow: totalAdvancing <= 2 });

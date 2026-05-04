@@ -93,6 +93,6 @@ export function computeStandings(
     s.gd = s.gf - s.ga;
   }
   return [...map.values()].sort(
-    (a, b) => b.gf - a.gf || b.gd - a.gd || a.ga - b.ga
+    (a, b) => b.gf - a.gf || b.gd - a.gd || a.ga - b.ga || a.team_id.localeCompare(b.team_id)
   );
 }

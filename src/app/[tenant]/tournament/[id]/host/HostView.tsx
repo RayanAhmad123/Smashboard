@@ -215,6 +215,24 @@ function HostInner({
   const matchByCourt = useMemo(() => {
     const map = new Map<string, TournamentMatch>();
     if (currentRound === null) return map;
+
+    // During KO phase all matches in the same stage play simultaneously —
+    // find the active KO round and show every match in it regardless of
+    // which group-play round number that slot corresponds to.
+    const incompleteKO = matches.filter(
+      (m) => m.stage !== "group" && m.status !== "completed"
+    );
+    if (incompleteKO.length > 0) {
+      const koRound = Math.min(...incompleteKO.map((m) => m.round_number));
+      for (const m of matches) {
+        if (m.stage !== "group" && m.round_number === koRound && m.court_id) {
+          map.set(m.court_id, m);
+        }
+      }
+      return map;
+    }
+
+    // Group phase: show only the current round's matches.
     for (const c of courts) {
       const found = matches.find(
         (mm) => mm.court_id === c.id && mm.round_number === currentRound

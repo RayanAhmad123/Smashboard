@@ -130,12 +130,12 @@ export function DashboardClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <div className="px-6 py-6">
         <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Sessioner</h1>
-            <p className="text-sm text-zinc-500 mt-1">{tenant.name}</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{tenant.name}</p>
           </div>
           <Link
             href={`/${tenant.slug}/tournament/new`}
@@ -147,12 +147,12 @@ export function DashboardClient({
         </div>
 
         {err && (
-          <div className="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-2 text-sm text-red-700 dark:text-red-400">
             {err}
           </div>
         )}
 
-        <div className="flex items-center gap-1 border-b border-zinc-200 mb-5 overflow-x-auto">
+        <div className="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-700 mb-5 overflow-x-auto">
           {(Object.keys(TAB_LABEL) as Tab[]).map((t) => {
             const active = tab === t;
             return (
@@ -161,8 +161,8 @@ export function DashboardClient({
                 onClick={() => setTab(t)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                   active
-                    ? "text-zinc-900"
-                    : "text-zinc-500 border-transparent hover:text-zinc-700"
+                    ? "text-zinc-900 dark:text-zinc-100"
+                    : "text-zinc-500 dark:text-zinc-400 border-transparent hover:text-zinc-700 dark:hover:text-zinc-300"
                 }`}
                 style={active ? { borderColor: accent } : undefined}
               >
@@ -171,7 +171,7 @@ export function DashboardClient({
                   className={`ml-2 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                     active
                       ? "text-white"
-                      : "bg-zinc-100 text-zinc-500"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
                   }`}
                   style={active ? { backgroundColor: accent } : undefined}
                 >
@@ -254,21 +254,21 @@ function TournamentCard({
   const spotsFill = spotsTotal > 0 ? Math.min(spotsTaken / spotsTotal, 1) : 0;
 
   return (
-    <li className="rounded-xl border border-zinc-200 bg-white p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
+    <li className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-semibold text-zinc-900 truncate">
+          <div className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
             {tournament.name}
           </div>
-          <div className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1.5">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex items-center gap-1.5">
             <span>{FORMAT_LABEL[tournament.format]}</span>
-            <span className="text-zinc-300">·</span>
+            <span className="text-zinc-300 dark:text-zinc-600">·</span>
             {isDraft ? (
               <span>{formatScheduled(tournament.scheduled_at)}</span>
             ) : (
               <>
                 <span>Mål {tournament.games_per_match}</span>
-                <span className="text-zinc-300">·</span>
+                <span className="text-zinc-300 dark:text-zinc-600">·</span>
                 <span>{created}</span>
               </>
             )}
@@ -279,13 +279,13 @@ function TournamentCard({
 
       {isPlanned && plannedStats && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
-            <span className="font-medium text-zinc-700">
+          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
               {spotsTaken} / {spotsTotal} lag bokade
             </span>
             <span className="tabular-nums">{Math.round(spotsFill * 100)}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
             <div
               className="h-full rounded-full transition-all"
               style={{ width: `${spotsFill * 100}%`, backgroundColor: accent }}
@@ -310,14 +310,14 @@ function TournamentCard({
 
       {!isDraft && (
         <div>
-          <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1">
             <span>
               Runda {tournament.current_round} /{" "}
               {tournament.total_rounds || "–"}
             </span>
             <span className="tabular-nums">{progress}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
             <div
               className="h-full rounded-full"
               style={{ width: `${progress}%`, backgroundColor: accent }}
@@ -338,7 +338,7 @@ function TournamentCard({
             </Link>
             <Link
               href={`/${tenantSlug}/tournament/${tournament.id}/start`}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
             >
               Starta →
             </Link>
@@ -355,7 +355,7 @@ function TournamentCard({
             </Link>
             <Link
               href={`/${tenantSlug}/tournament/${tournament.id}/host`}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
             >
               Värd
             </Link>
@@ -366,7 +366,7 @@ function TournamentCard({
           <button
             onClick={onDuplicate}
             disabled={busy}
-            className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
+            className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
           >
             {busy ? "..." : "Duplicera"}
           </button>
@@ -374,7 +374,7 @@ function TournamentCard({
         <button
           onClick={() => onArchive(!archived)}
           disabled={busy}
-          className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
+          className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
         >
           {busy ? "..." : archived ? "Återställ" : "Arkivera"}
         </button>
@@ -401,7 +401,7 @@ function StatusBadge({
 }) {
   if (tournament.archived_at) {
     return (
-      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-zinc-100 text-zinc-500 shrink-0">
+      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 shrink-0">
         Arkiverad
       </span>
     );
@@ -422,20 +422,20 @@ function StatusBadge({
   }
   if (tournament.status === "draft" && tournament.open_registration) {
     return (
-      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-sky-50 text-sky-700 shrink-0">
+      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-400 shrink-0">
         Bokning öppen
       </span>
     );
   }
   if (tournament.status === "draft") {
     return (
-      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-amber-50 text-amber-700 shrink-0">
+      <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 shrink-0">
         Utkast
       </span>
     );
   }
   return (
-    <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-zinc-100 text-zinc-600 shrink-0">
+    <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 shrink-0">
       Avslutad
     </span>
   );
@@ -458,8 +458,8 @@ function EmptyState({
     archived: "Arkivet är tomt.",
   };
   return (
-    <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
-      <p className="text-zinc-500 text-sm mb-4">{messages[tab]}</p>
+    <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-6 py-12 text-center">
+      <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">{messages[tab]}</p>
       {tab !== "archived" && (
         <Link
           href={`/${tenantSlug}/tournament/new`}

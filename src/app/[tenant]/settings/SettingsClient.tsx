@@ -126,27 +126,27 @@ export function SettingsClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
       <div className="px-6 py-6 max-w-4xl">
         <h1 className="text-2xl font-bold tracking-tight mb-1">
           Inställningar
         </h1>
-        <p className="text-sm text-zinc-500 mb-6">{tenant.name}</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{tenant.name}</p>
 
         {err && (
-          <div className="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-2 text-sm text-red-700 dark:text-red-400">
             {err}
           </div>
         )}
 
-        <section className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-5 mb-6">
           <h2 className="text-base font-semibold mb-4">Varumärke</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Klubbnamn">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white"
+                className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
               />
             </Field>
             <Field label="Logo URL">
@@ -154,7 +154,7 @@ export function SettingsClient({
                 value={logo}
                 onChange={(e) => setLogo(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white"
+                className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
               />
             </Field>
             <Field label="Primärfärg">
@@ -163,12 +163,12 @@ export function SettingsClient({
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-14 rounded-md border border-zinc-300 cursor-pointer"
+                  className="h-10 w-14 rounded-md border border-zinc-300 dark:border-zinc-600 cursor-pointer"
                 />
                 <input
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-md border border-zinc-300 bg-white font-mono text-sm"
+                  className="flex-1 px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100 font-mono text-sm"
                 />
               </div>
             </Field>
@@ -199,12 +199,12 @@ export function SettingsClient({
               {savingTenant ? "Sparar..." : "Spara"}
             </button>
             {savedTenant && (
-              <span className="text-sm text-zinc-500">Sparad ✓</span>
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">Sparad ✓</span>
             )}
           </div>
         </section>
 
-        <section className="rounded-xl border border-zinc-200 bg-white p-5">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-5">
           <h2 className="text-base font-semibold mb-4">Banor</h2>
 
           <div className="flex gap-2 mb-4">
@@ -215,7 +215,7 @@ export function SettingsClient({
                 if (e.key === "Enter") void handleAddCourt();
               }}
               placeholder="t.ex. Court 9"
-              className="flex-1 px-3 py-2 rounded-md border border-zinc-300 bg-white"
+              className="flex-1 px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
             />
             <button
               onClick={handleAddCourt}
@@ -228,28 +228,28 @@ export function SettingsClient({
           </div>
 
           {courts.length === 0 ? (
-            <div className="text-sm text-zinc-500 py-6 text-center border border-dashed border-zinc-200 rounded-md">
+            <div className="text-sm text-zinc-500 dark:text-zinc-400 py-6 text-center border border-dashed border-zinc-200 dark:border-zinc-700 rounded-md">
               Inga banor.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-100 border border-zinc-200 rounded-md overflow-hidden">
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
               {courts.map((c, i) => (
                 <li
                   key={c.id}
-                  className="flex items-center gap-2 px-3 py-2 bg-white"
+                  className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900"
                 >
-                  <span className="text-zinc-400 text-xs font-mono w-6 text-right">
+                  <span className="text-zinc-400 dark:text-zinc-500 text-xs font-mono w-6 text-right">
                     {i + 1}
                   </span>
                   <input
                     defaultValue={c.name}
                     onBlur={(e) => handleRename(c, e.target.value)}
-                    className="flex-1 px-2 py-1 rounded border border-transparent hover:border-zinc-200 focus:border-zinc-300 focus:outline-none"
+                    className="flex-1 px-2 py-1 rounded border border-transparent hover:border-zinc-200 dark:hover:border-zinc-600 focus:border-zinc-300 dark:focus:border-zinc-500 focus:outline-none bg-transparent text-zinc-900 dark:text-zinc-100"
                   />
                   <button
                     onClick={() => move(c, -1)}
                     disabled={busy === c.id || i === 0}
-                    className="px-2 py-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-30"
+                    className="px-2 py-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30"
                     aria-label="Flytta upp"
                   >
                     ↑
@@ -257,7 +257,7 @@ export function SettingsClient({
                   <button
                     onClick={() => move(c, 1)}
                     disabled={busy === c.id || i === courts.length - 1}
-                    className="px-2 py-1 text-zinc-400 hover:text-zinc-700 disabled:opacity-30"
+                    className="px-2 py-1 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 disabled:opacity-30"
                     aria-label="Flytta ned"
                   >
                     ↓
@@ -265,7 +265,7 @@ export function SettingsClient({
                   <button
                     onClick={() => handleDelete(c)}
                     disabled={busy === c.id}
-                    className="px-2 py-1 text-zinc-400 hover:text-red-600 disabled:opacity-50"
+                    className="px-2 py-1 text-zinc-400 dark:text-zinc-500 hover:text-red-600 disabled:opacity-50"
                     aria-label="Ta bort"
                   >
                     ✕
@@ -289,7 +289,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="text-xs text-zinc-500 mb-1 font-medium">{label}</div>
+      <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-1 font-medium">{label}</div>
       {children}
     </label>
   );

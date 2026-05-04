@@ -78,11 +78,11 @@ export function PlayersClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200 px-4 sm:px-8 py-6 flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <header className="border-b border-zinc-200 dark:border-zinc-700 px-4 sm:px-8 py-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Spelare</h1>
-          <p className="text-sm text-zinc-500">{tenant.name}</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{tenant.name}</p>
         </div>
         <button
           className="px-4 py-2 rounded-md text-white text-sm font-medium shrink-0"
@@ -94,18 +94,18 @@ export function PlayersClient({
       </header>
 
       {err && (
-        <div className="mx-4 sm:mx-8 mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="mx-4 sm:mx-8 mt-4 rounded-md bg-red-50 dark:bg-red-950 px-4 py-2 text-sm text-red-700 dark:text-red-400">
           {err}
         </div>
       )}
 
       {adding && (
-        <div className="mx-4 sm:mx-8 mt-6 p-4 rounded-lg border border-zinc-200 bg-white flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="mx-4 sm:mx-8 mt-6 p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
-            <label className="text-xs text-zinc-500 block mb-1">Förnamn</label>
+            <label className="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Förnamn</label>
             <input
               autoFocus
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPlayer()}
@@ -113,9 +113,9 @@ export function PlayersClient({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs text-zinc-500 block mb-1">Efternamn</label>
+            <label className="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Efternamn</label>
             <input
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPlayer()}
@@ -123,9 +123,9 @@ export function PlayersClient({
             />
           </div>
           <div className="sm:w-32">
-            <label className="text-xs text-zinc-500 block mb-1">Nivå</label>
+            <label className="text-xs text-zinc-500 dark:text-zinc-400 block mb-1">Nivå</label>
             <select
-              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900"
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
               value={level}
               onChange={(e) => setLevel(parseFloat(e.target.value))}
             >
@@ -148,9 +148,9 @@ export function PlayersClient({
       )}
 
       <main className="p-4 sm:p-8">
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
           <table className="w-full text-sm min-w-[400px]">
-            <thead className="bg-zinc-50 text-left text-zinc-500">
+            <thead className="bg-zinc-50 dark:bg-zinc-800 text-left text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3 font-medium">Namn</th>
                 <th className="px-4 py-3 font-medium w-40">Nivå</th>
@@ -160,7 +160,7 @@ export function PlayersClient({
             <tbody>
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={3} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Inga spelare än. Lägg till några för att komma igång.
                   </td>
                 </tr>
@@ -168,12 +168,12 @@ export function PlayersClient({
               {players.map((p) => (
                 <tr
                   key={p.id}
-                  className="border-t border-zinc-100"
+                  className="border-t border-zinc-100 dark:border-zinc-800"
                 >
                   <td className="px-4 py-3 font-medium">{p.name}</td>
                   <td className="px-4 py-3">
                     <select
-                      className="px-2 py-1 rounded border border-zinc-300 bg-white text-zinc-900"
+                      className="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
                       value={p.level}
                       onChange={(e) => changeLevel(p, parseFloat(e.target.value))}
                     >
@@ -191,7 +191,7 @@ export function PlayersClient({
                         checked={p.active}
                         onChange={() => toggleActive(p)}
                       />
-                      <span className="text-zinc-500">
+                      <span className="text-zinc-500 dark:text-zinc-400">
                         {p.active ? "Aktiv" : "Inaktiv"}
                       </span>
                     </label>

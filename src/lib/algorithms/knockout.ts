@@ -86,7 +86,7 @@ function buildFinalMatches(
 // 3-4 teams advancing → Semi-finals (with possible byes)
 function buildSFMatches(
   groupStandings: GroupStanding[],
-  byeGroupIds: string[],
+  _byeGroupIds: string[],
   courts: Court[],
   tournamentId: string,
   hasBronze: boolean
@@ -94,12 +94,11 @@ function buildSFMatches(
   const matches: GeneratedKOMatch[] = [];
   const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
   const bracketSize = nextPowerOf2(totalAdvancing); // always 4 here
-  const byeCount = bracketSize - totalAdvancing;
+  const internalByeCount = bracketSize - totalAdvancing;
 
-  // Collect all seeds: group 1st places first, then 2nd places, etc.
-  // byeGroupIds teams skip into SF directly.
+  // Byes go to the top seeds automatically (highest rank first).
   const allTeams = collectSeeds(groupStandings, Math.ceil(totalAdvancing / groupStandings.length));
-  const byeTeams = allTeams.filter((t) => byeGroupIds.includes(t.groupId) && t.rank === 0).slice(0, byeCount);
+  const byeTeams = allTeams.slice(0, internalByeCount);
   const byeSet = new Set(byeTeams.map((t) => t.team_id));
   const playingTeams = allTeams.filter((t) => !byeSet.has(t.team_id));
 
@@ -107,7 +106,7 @@ function buildSFMatches(
   // Bye teams take SF slots directly; playing teams fill QF-like slots
   // With 3 advancing (1 bye): SF1 = bye vs QF winner, SF2 = team2 vs team3
   // With 4 advancing (0 byes): SF1 = seed1 vs seed4, SF2 = seed2 vs seed3
-  if (byeCount === 0) {
+  if (internalByeCount === 0) {
     // All 4 play, straight SF
     const court0 = courts[0] ?? null;
     const court1 = courts[1] ?? courts[0] ?? null;
@@ -124,38 +123,46 @@ function buildSFMatches(
   return matches;
 }
 
-// 5-8 teams advancing → Quarter-finals (with possible byes)
+// 5+ teams advancing → Quarter-finals (with possible byes for top seeds)
 function buildQFMatches(
   groupStandings: GroupStanding[],
-  byeGroupIds: string[],
+  _byeGroupIds: string[],
   courts: Court[],
   tournamentId: string,
   hasBronze: boolean
 ): GeneratedKOMatch[] {
   const matches: GeneratedKOMatch[] = [];
   const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
-  const bracketSize = nextPowerOf2(totalAdvancing); // 8
-  const byeCount = bracketSize - totalAdvancing;
+  // Target an 8-team QF bracket. If totalAdvancing > 8, the top seeds get byes
+  // into QF; the rest play a play-in round to fill the remaining QF slots.
+  const qfSlots = 8;
+  const playInMatches = totalAdvancing - qfSlots; // negative means byes needed
+  const internalByeCount = playInMatches < 0 ? -playInMatches : 0;
+  const playInCount = playInMatches > 0 ? playInMatches * 2 : 0;
 
   const allTeams = collectSeeds(groupStandings, Math.max(...groupStandings.map((g) => g.standings.length)));
-  const byeTeams = allTeams.filter((t) => byeGroupIds.includes(t.groupId) && t.rank === 0).slice(0, byeCount);
-  const byeSet = new Set(byeTeams.map((t) => t.team_id));
-  const playingTeams = allTeams.filter((t) => !byeSet.has(t.team_id));
 
-  // Classic seeding: seed[0] vs seed[n-1], seed[1] vs seed[n-2], etc.
-  const n = playingTeams.length;
-  for (let i = 0; i < Math.floor(n / 2); i++) {
-    const court = courts[i % courts.length] ?? null;
-    matches.push(
-      makeMatch(
-        tournamentId,
-        playingTeams[i].team_id,
-        playingTeams[n - 1 - i].team_id,
-        "quarter_final",
-        court,
-        1
-      )
-    );
+  // Byes go to the top seeds automatically.
+  const byeTeams = allTeams.slice(0, internalByeCount);
+  const byeSet = new Set(byeTeams.map((t) => t.team_id));
+  // Play-in teams are the lowest seeds.
+  const playInTeams = playInCount > 0 ? allTeams.slice(allTeams.length - playInCount) : [];
+  const playInSet = new Set(playInTeams.map((t) => t.team_id));
+  const playingTeams = allTeams.filter((t) => !byeSet.has(t.team_id) && !playInSet.has(t.team_id));
+
+  if (playInTeams.length > 0) {
+    // Play-in round: lowest seeds play each other to earn QF spots.
+    for (let i = 0; i < playInTeams.length - 1; i += 2) {
+      const court = courts[i % courts.length] ?? null;
+      matches.push(makeMatch(tournamentId, playInTeams[i].team_id, playInTeams[i + 1].team_id, "quarter_final", court, 1));
+    }
+  } else {
+    // Classic QF seeding: seed[0] vs seed[n-1], seed[1] vs seed[n-2], etc.
+    const n = playingTeams.length;
+    for (let i = 0; i < Math.floor(n / 2); i++) {
+      const court = courts[i % courts.length] ?? null;
+      matches.push(makeMatch(tournamentId, playingTeams[i].team_id, playingTeams[n - 1 - i].team_id, "quarter_final", court, 1));
+    }
   }
   return matches;
 }
@@ -202,11 +209,10 @@ export function generateNextKORound(
   return matches;
 }
 
-// How many byes are needed for the given groups and advancesPerGroup.
-export function byeCount(groupStandings: GroupStanding[]): number {
-  const total = groupStandings.reduce((s, g) => s + g.standings.length, 0);
-  if (total <= 1) return 0;
-  return nextPowerOf2(total) - total;
+// Byes are assigned automatically to top seeds — no host selection needed.
+// This always returns 0 so the UI skips the group-selection step entirely.
+export function byeCount(_groupStandings: GroupStanding[]): number {
+  return 0;
 }
 
 type SeedEntry = { team_id: string; groupId: string; rank: number };

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { supabaseClient } from "@/lib/supabase/client";
 import type {
   Tenant,
   Tournament,
@@ -81,6 +82,30 @@ export function PlanView({
   const [registrations, setRegistrations] =
     useState<TournamentRegistration[]>(initialRegistrations);
   const [busyRegId, setBusyRegId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const channel = supabaseClient
+      .channel(`plan-registrations-${tournament.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "tournament_registrations",
+          filter: `tournament_id=eq.${tournament.id}`,
+        },
+        (payload) => {
+          const incoming = payload.new as TournamentRegistration;
+          setRegistrations((prev) => {
+            if (prev.some((r) => r.id === incoming.id)) return prev;
+            return [...prev, incoming];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { void supabaseClient.removeChannel(channel); };
+  }, [tournament.id]);
 
   const playerMap = useMemo(() => {
     const m = new Map<string, Player>();

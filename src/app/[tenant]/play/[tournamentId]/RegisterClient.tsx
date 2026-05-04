@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Tenant, Tournament, TournamentRegistration } from "@/lib/supabase/types";
 import { submitRegistration } from "@/lib/db/registrations";
-import { saveBooking } from "@/lib/playerBookings";
+import { loadBookings, saveBooking } from "@/lib/playerBookings";
 
 const FORMAT_LABEL: Record<string, string> = {
   gruppspel: "Gruppspel",
@@ -48,6 +48,14 @@ export function RegisterClient({
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<TournamentRegistration | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+
+  useEffect(() => {
+    const bookings = loadBookings(tenant.slug);
+    if (bookings.some((b) => b.tournamentId === tournament.id)) {
+      setAlreadyRegistered(true);
+    }
+  }, [tenant.slug, tournament.id]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -84,6 +92,44 @@ export function RegisterClient({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (alreadyRegistered && !done) {
+    return (
+      <div className="min-h-screen bg-zinc-50 text-zinc-900">
+        <div className="max-w-md mx-auto px-4 py-12 text-center">
+          <div
+            className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4 text-3xl"
+            style={{ backgroundColor: `${accent}22`, color: accent }}
+          >
+            ✓
+          </div>
+          <h1 className="text-2xl font-semibold mb-2">Redan anmäld</h1>
+          <p className="text-sm text-zinc-600 mb-1">
+            Du är redan anmäld till den här sessionen på den här enheten.
+          </p>
+          <p className="text-sm text-zinc-500">
+            {tournament.name} · {formatScheduled(tournament.scheduled_at)}
+          </p>
+          <div className="mt-8 flex items-center justify-center gap-5 text-sm font-medium">
+            <Link
+              href={`/${tenant.slug}/play`}
+              className="underline"
+              style={{ color: accent }}
+            >
+              ← Andra sessioner
+            </Link>
+            <Link
+              href={`/${tenant.slug}/play?tab=mina`}
+              className="underline"
+              style={{ color: accent }}
+            >
+              Mina bokningar
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (done) {

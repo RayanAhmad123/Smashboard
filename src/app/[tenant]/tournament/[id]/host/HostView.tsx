@@ -30,6 +30,22 @@ import {
 } from "@/lib/algorithms/knockout";
 import type { RoundRest } from "@/lib/supabase/types";
 
+const KO_STAGE_LABEL: Record<string, string> = {
+  quarter_final: "Kvartsfinal",
+  semi_final: "Semifinal",
+  final: "Final",
+  bronze: "Bronsmatch",
+};
+
+function koStageBadgeColor(stage: string): string {
+  switch (stage) {
+    case "final": return "#d97706";
+    case "semi_final": return "#7c3aed";
+    case "bronze": return "#b45309";
+    default: return "#059669"; // quarter_final / fallback → emerald
+  }
+}
+
 type Loaded = {
   tournament: Tournament;
   groups: TournamentGroup[];
@@ -398,6 +414,24 @@ function HostInner({
     return null;
   }, [koMatches]);
 
+  // Progress per KO stage — used in header and court grouping.
+  const koStageProgress = useMemo(() => {
+    if (!hasKO) return [];
+    return (["quarter_final", "semi_final", "final"] as const)
+      .map((stage) => {
+        const sm = koMatches.filter((m) => m.stage === stage);
+        if (sm.length === 0) return null;
+        return { stage, completed: sm.filter((m) => m.status === "completed").length, total: sm.length };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [hasKO, koMatches]);
+
+  // All distinct KO stages currently running (incomplete, non-bronze).
+  const runningKOStages = useMemo(
+    () => [...new Set(koMatches.filter((m) => m.status !== "completed" && m.stage !== "bronze").map((m) => m.stage))],
+    [koMatches]
+  );
+
   // Round-number based: the most recently completed non-bronze KO round.
   // Stage labels can repeat across rounds (e.g. play-in QF then real QF for
   // 9+ team brackets), so we key by round_number, not stage.
@@ -586,24 +620,36 @@ function HostInner({
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {currentRound !== null && (
-            <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-              <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
-                Runda{" "}
-                {tournament.total_rounds > 0
-                  ? `${currentRound}/${tournament.total_rounds}`
-                  : currentRound}
+          {(tournamentPhase === "ko_active" || tournamentPhase === "done") && koStageProgress.length > 0 ? (
+            koStageProgress.map(({ stage, completed, total }) => (
+              <div key={stage} className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                <div className="text-[10px] uppercase tracking-wide leading-none mb-0.5 font-semibold"
+                  style={{ color: koStageBadgeColor(stage) }}>
+                  {KO_STAGE_LABEL[stage] ?? stage}
+                </div>
+                <div className="text-sm font-semibold tabular-nums leading-tight">
+                  {completed}
+                  <span className="text-zinc-400 font-normal">/{total}</span>
+                  <span className="text-zinc-500 font-normal text-[11px] ml-1">klara</span>
+                </div>
               </div>
-              <div className="text-sm font-semibold tabular-nums leading-tight">
-                {roundCompleted}
-                <span className="text-zinc-400 font-normal">
-                  /{roundTotal}
-                </span>
-                <span className="text-zinc-500 font-normal text-[11px] ml-1">
-                  banor
-                </span>
+            ))
+          ) : (
+            currentRound !== null && (
+              <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
+                  Runda{" "}
+                  {tournament.total_rounds > 0
+                    ? `${currentRound}/${tournament.total_rounds}`
+                    : currentRound}
+                </div>
+                <div className="text-sm font-semibold tabular-nums leading-tight">
+                  {roundCompleted}
+                  <span className="text-zinc-400 font-normal">/{roundTotal}</span>
+                  <span className="text-zinc-500 font-normal text-[11px] ml-1">banor</span>
+                </div>
               </div>
-            </div>
+            )
           )}
           <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
@@ -656,9 +702,24 @@ function HostInner({
 
       <main className="px-5 py-4 grid lg:grid-cols-[1fr_300px] gap-5">
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 mb-2">
-            Aktiva matcher
-          </h2>
+          <div className="flex items-center justify-between mb-2 gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Aktiva matcher
+            </h2>
+            {runningKOStages.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                {runningKOStages.map((stage) => (
+                  <span
+                    key={stage}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: koStageBadgeColor(stage) }}
+                  >
+                    {KO_STAGE_LABEL[stage] ?? stage}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           {restingTeamIdsThisRound.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
               {restingTeamIdsThisRound.map((tid) => {
@@ -671,6 +732,55 @@ function HostInner({
               })}
             </div>
           )}
+          {/* During KO phase with multiple running stages, group courts by stage */}
+          {runningKOStages.length > 1 ? (
+            <div className="space-y-4">
+              {(["quarter_final", "semi_final", "final", "bronze"] as const).map((stage) => {
+                const stageCourts = sortedCourts.filter((c) => matchByCourt.get(c.id)?.stage === stage);
+                if (stageCourts.length === 0) return null;
+                return (
+                  <div key={stage}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                        style={{ backgroundColor: koStageBadgeColor(stage) }}
+                      >
+                        {KO_STAGE_LABEL[stage] ?? stage}
+                      </span>
+                      <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+                    </div>
+                    <div className={`grid gap-2 ${stageCourts.length > 1 ? "lg:grid-cols-2" : "grid-cols-1"}`}>
+                      {stageCourts.map((c) => {
+                        const m = matchByCourt.get(c.id)!;
+                        const blocking = blockedBy.get(c.id);
+                        if (blocking && blocking.length > 0) {
+                          return (
+                            <LockedCard
+                              key={m.id} match={m}
+                              team1={teamMap.get(m.team1_id)!} team2={teamMap.get(m.team2_id)!}
+                              playerMap={playerMap} courtName={c.name}
+                              stage={stageLabel(m, groupMap)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                              blockingTeams={blocking}
+                            />
+                          );
+                        }
+                        return (
+                          <MatchCard
+                            key={m.id} match={m}
+                            team1={teamMap.get(m.team1_id)!} team2={teamMap.get(m.team2_id)!}
+                            playerMap={playerMap} courtName={c.name}
+                            stage={stageLabel(m, groupMap)} badgeClass={badgeClassForMatch(m, groupIndexMap)}
+                            onSave={(s1, s2) => saveScore(m, s1, s2)}
+                            busy={busy === m.id} gamesPerMatch={tournament.games_per_match}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
           <div
             className={`grid gap-2 ${courts.length > 1 ? "lg:grid-cols-2" : "grid-cols-1"}`}
           >
@@ -717,6 +827,7 @@ function HostInner({
               );
             })}
           </div>
+          )}
         </section>
 
         <section>

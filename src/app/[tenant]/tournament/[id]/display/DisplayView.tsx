@@ -503,7 +503,6 @@ function RestingChip({
 }
 
 // --- KO Bracket View ---
-// Left: bracket tree showing all stages. Right: active match cards (large).
 
 const KO_STAGE_LABELS: Record<string, string> = {
   quarter_final: "Kvartsfinal",
@@ -511,6 +510,17 @@ const KO_STAGE_LABELS: Record<string, string> = {
   final: "Final",
   bronze: "Bronsmatch",
 };
+
+const KO_STAGE_ORDER = ["quarter_final", "semi_final", "final", "bronze"] as const;
+
+function koStageColor(stage: string, accent: string): string {
+  switch (stage) {
+    case "final": return "#d97706";
+    case "semi_final": return "#7c3aed";
+    case "bronze": return "#b45309";
+    default: return accent;
+  }
+}
 
 function KOView({
   koMatches,
@@ -542,52 +552,100 @@ function KOView({
     [courts, koMatches]
   );
 
-  const activeBronze = koMatches.filter(
-    (m) => m.stage === "bronze" && m.status !== "completed"
-  );
-
   const displayCourts = koCourts.length > 0 ? koCourts : courts;
+
+  // Group active courts by their current match's stage for simultaneous QF+SF display.
+  const stageGroups = useMemo(() => {
+    return KO_STAGE_ORDER
+      .map((stage) => ({
+        stage,
+        courts: displayCourts.filter((c) => byCourt.get(c.id)?.stage === stage),
+        color: koStageColor(stage, accent),
+      }))
+      .filter((g) => g.courts.length > 0);
+  }, [displayCourts, byCourt, accent]);
+
+  const hasMultipleStages = stageGroups.length > 1;
+
+  // All active stages for the header label
+  const activeStages = useMemo(
+    () => [...new Set(koMatches.filter((m) => m.status !== "completed" && m.stage !== "bronze").map((m) => m.stage))],
+    [koMatches]
+  );
+  const activeBronze = koMatches.some((m) => m.stage === "bronze" && m.status !== "completed");
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-[1vh]">
-      {(activeKOStage || activeBronze.length > 0) && (
-        <div className="flex items-center gap-[1vw]">
-          {activeKOStage && (
-            <span
-              className="font-black uppercase tracking-widest px-[1vw] py-[0.4vh] rounded-full text-white"
-              style={{
-                backgroundColor: activeKOStage === "final" ? "#d97706" : accent,
-                fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)",
-              }}
-            >
-              {KO_STAGE_LABELS[activeKOStage] ?? activeKOStage}
-            </span>
-          )}
-          {activeBronze.length > 0 && (
-            <span
-              className="font-black uppercase tracking-widest px-[1vw] py-[0.4vh] rounded-full text-white"
-              style={{
-                backgroundColor: "#b45309",
-                fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)",
-              }}
-            >
-              Bronsmatch
-            </span>
-          )}
-        </div>
-      )}
-      <div className="flex-1 min-h-0">
-        <MatchesView
-          courts={displayCourts}
-          byCourt={byCourt}
-          nextByCourt={nextByCourt}
-          lockedByCourt={lockedByCourt}
-          teamMap={teamMap}
-          groupMap={groupMap}
-          groupIndexMap={groupIndexMap}
-          playerMap={playerMap}
-          accent={accent}
-        />
+      {/* Stage header row */}
+      <div className="flex items-center gap-[1vw] flex-wrap">
+        <span
+          className="font-bold uppercase tracking-widest text-zinc-400"
+          style={{ fontSize: "clamp(0.6rem, 0.85vw, 1rem)" }}
+        >
+          Slutspel
+        </span>
+        {activeStages.map((stage) => (
+          <span
+            key={stage}
+            className="font-black uppercase tracking-widest px-[1vw] py-[0.35vh] rounded-full text-white"
+            style={{ backgroundColor: koStageColor(stage, accent), fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)" }}
+          >
+            {KO_STAGE_LABELS[stage] ?? stage}
+          </span>
+        ))}
+        {activeBronze && (
+          <span
+            className="font-black uppercase tracking-widest px-[1vw] py-[0.35vh] rounded-full text-white"
+            style={{ backgroundColor: "#b45309", fontSize: "clamp(0.7rem, 1.1vw, 1.4rem)" }}
+          >
+            Bronsmatch
+          </span>
+        )}
+      </div>
+
+      {/* Courts — split into labeled sections when multiple stages run simultaneously */}
+      <div className={`flex-1 min-h-0 ${hasMultipleStages ? "flex gap-[2vw]" : ""}`}>
+        {hasMultipleStages ? (
+          stageGroups.map(({ stage, courts: stageCourts, color }) => (
+            <div key={stage} className="flex-1 min-h-0 flex flex-col gap-[0.6vh]">
+              <div className="flex items-center gap-[0.6vw]">
+                <div className="h-[2px] w-[1vw] rounded" style={{ backgroundColor: color }} />
+                <span
+                  className="font-black uppercase tracking-widest text-white px-[0.8vw] py-[0.25vh] rounded-full"
+                  style={{ backgroundColor: color, fontSize: "clamp(0.55rem, 0.85vw, 1rem)" }}
+                >
+                  {KO_STAGE_LABELS[stage] ?? stage}
+                </span>
+                <div className="h-[2px] flex-1 rounded" style={{ backgroundColor: color }} />
+              </div>
+              <div className="flex-1 min-h-0">
+                <MatchesView
+                  courts={stageCourts}
+                  byCourt={byCourt}
+                  nextByCourt={nextByCourt}
+                  lockedByCourt={lockedByCourt}
+                  teamMap={teamMap}
+                  groupMap={groupMap}
+                  groupIndexMap={groupIndexMap}
+                  playerMap={playerMap}
+                  accent={accent}
+                />
+              </div>
+            </div>
+          ))
+        ) : (
+          <MatchesView
+            courts={displayCourts}
+            byCourt={byCourt}
+            nextByCourt={nextByCourt}
+            lockedByCourt={lockedByCourt}
+            teamMap={teamMap}
+            groupMap={groupMap}
+            groupIndexMap={groupIndexMap}
+            playerMap={playerMap}
+            accent={accent}
+          />
+        )}
       </div>
     </div>
   );
@@ -896,11 +954,20 @@ function CourtCard({
               {stage}
             </div>
           ) : (
+            // KO stage — colored pill so it's always obvious
             <div
-              className={`font-bold uppercase tracking-wider ${isFinal ? "text-amber-600" : "text-zinc-500"}`}
-              style={{ fontSize: "clamp(0.55rem, 2.5cqi, 1.6rem)" }}
+              className="font-black uppercase tracking-wider px-[0.5em] py-[0.15em] rounded-full text-white"
+              style={{
+                fontSize: "clamp(0.5rem, 2.2cqi, 1.4rem)",
+                backgroundColor: match?.stage === "final"
+                  ? "#d97706"
+                  : match?.stage === "semi_final"
+                    ? "#7c3aed"
+                    : match?.stage === "bronze"
+                      ? "#b45309"
+                      : accent,
+              }}
             >
-              {isFinal && <span className="mr-1">★</span>}
               {stage}
             </div>
           )

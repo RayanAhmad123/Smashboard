@@ -36,6 +36,58 @@ function shuffle<T>(arr: T[]): T[] {
 
 type Preset = { groups: number; advances: number };
 
+type TimeEstimate = {
+  matchMinutes: number;
+  groupMinutes: number;
+  playoffMinutes: number;
+  totalMinutes: number;
+};
+
+function estimateTournamentTime(
+  fullTeamCount: number,
+  numGroups: number,
+  advancesPerGroup: number,
+  hasBronze: boolean,
+  gamesPerMatch: number,
+  activeCourts: number,
+): TimeEstimate {
+  const matchMinutes = gamesPerMatch * 3 + 5;
+  const zero = { matchMinutes, groupMinutes: 0, playoffMinutes: 0, totalMinutes: 0 };
+
+  if (fullTeamCount < 2 || numGroups < 1 || activeCourts < 1) return zero;
+
+  const teamsPerGroup = Math.floor(fullTeamCount / numGroups);
+  if (teamsPerGroup < 2) return zero;
+
+  const roundsPerGroup = teamsPerGroup % 2 === 0 ? teamsPerGroup - 1 : teamsPerGroup;
+  const matchesPerRoundPerGroup = Math.floor(teamsPerGroup / 2);
+  const courtsPerGroup = Math.max(1, Math.floor(activeCourts / numGroups));
+  // How many time-slots per round (courts may force serial play within a group)
+  const slotsPerRound = Math.ceil(matchesPerRoundPerGroup / courtsPerGroup);
+  const groupMinutes = roundsPerGroup * slotsPerRound * matchMinutes;
+
+  let playoffMinutes = 0;
+  if (advancesPerGroup > 0) {
+    const totalAdvancing = advancesPerGroup * numGroups;
+    // QF: up to 4 simultaneous matches
+    if (totalAdvancing > 4) playoffMinutes += Math.ceil(4 / activeCourts) * matchMinutes;
+    // SF: up to 2 simultaneous matches
+    if (totalAdvancing > 2) playoffMinutes += Math.ceil(2 / activeCourts) * matchMinutes;
+    // Final (and bronze runs on another court simultaneously if possible)
+    const finalSlotMatches = hasBronze ? 2 : 1;
+    playoffMinutes += Math.ceil(finalSlotMatches / activeCourts) * matchMinutes;
+  }
+
+  return { matchMinutes, groupMinutes, playoffMinutes, totalMinutes: groupMinutes + playoffMinutes };
+}
+
+function fmtTime(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
 function getPresets(n: number): Preset[] {
   const out: Preset[] = [];
   if (n < 4) return out;
@@ -197,6 +249,18 @@ export function StartView({
   const teamsPerGroup = fullTeamCount > 0 ? Math.floor(fullTeamCount / Math.max(1, numGroups)) : 0;
   const suggestedCourtsPerGroup = Math.floor(teamsPerGroup / 2);
   const suggestedTotalCourts = Math.max(1, numGroups * suggestedCourtsPerGroup);
+
+  // Use selected courts if any; fall back to the suggested count for estimates
+  // before the host has picked courts.
+  const activeCourtsForEstimate = selectedCourts.size > 0 ? selectedCourts.size : suggestedTotalCourts;
+  const estimate = estimateTournamentTime(
+    fullTeamCount,
+    numGroups,
+    advancesPerGroup,
+    hasBronze,
+    gamesPerMatch,
+    Math.max(1, activeCourtsForEstimate),
+  );
 
   const canSubmit =
     formatSupported &&
@@ -430,6 +494,10 @@ export function StartView({
                   {presets.map((p) => {
                     const total = p.groups * p.advances;
                     const active = numGroups === p.groups && advancesPerGroup === p.advances;
+                    const presetEst = estimateTournamentTime(
+                      fullTeamCount, p.groups, p.advances, hasBronze,
+                      gamesPerMatch, Math.max(1, activeCourtsForEstimate),
+                    );
                     return (
                       <button
                         key={`${p.groups}-${p.advances}`}
@@ -447,6 +515,7 @@ export function StartView({
                       >
                         {p.groups} grupper × {p.advances} vidare
                         <span className="ml-1.5 opacity-70">· {stageLabel(total)}</span>
+                        <span className="ml-1.5 opacity-60">· ~{fmtTime(presetEst.totalMinutes)}</span>
                       </button>
                     );
                   })}
@@ -546,6 +615,36 @@ export function StartView({
             </div>
           )}
         </section>
+
+        {fullTeamCount >= 2 && estimate.totalMinutes > 0 && (
+          <section className="rounded-xl border border-zinc-200 bg-white p-4">
+            <h2 className="text-sm font-semibold text-zinc-700 mb-3">Tidsuppskattning</h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+              <div className="text-zinc-500">Per match</div>
+              <div className="font-medium tabular-nums">~{fmtTime(estimate.matchMinutes)}</div>
+
+              <div className="text-zinc-500">Gruppspel</div>
+              <div className="font-medium tabular-nums">~{fmtTime(estimate.groupMinutes)}</div>
+
+              {estimate.playoffMinutes > 0 && (
+                <>
+                  <div className="text-zinc-500">Slutspel</div>
+                  <div className="font-medium tabular-nums">~{fmtTime(estimate.playoffMinutes)}</div>
+                </>
+              )}
+
+              <div className="text-zinc-500 font-semibold pt-1 border-t border-zinc-100">Totalt</div>
+              <div className="font-semibold tabular-nums pt-1 border-t border-zinc-100" style={{ color: accent }}>
+                ~{fmtTime(estimate.totalMinutes)}
+              </div>
+            </div>
+            {selectedCourts.size === 0 && (
+              <p className="text-xs text-zinc-400 mt-2">
+                Baserat på {activeCourtsForEstimate} rekommenderade {activeCourtsForEstimate === 1 ? "bana" : "banor"} — välj banor nedan för exaktare uppskattning.
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="rounded-xl border border-zinc-200 bg-white p-4">
           <div className="flex items-start justify-between mb-2 gap-3">

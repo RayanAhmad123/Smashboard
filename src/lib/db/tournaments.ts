@@ -389,3 +389,58 @@ export async function updateTournamentPlayoffSettings(
     .eq("id", id);
   if (error) throw error;
 }
+
+export async function duplicateTournamentAsDraft(
+  sourceId: string,
+  tenantId: string
+): Promise<Tournament> {
+  const sb = supabaseClient;
+
+  const { data: source, error: srcErr } = await sb
+    .from("tournaments")
+    .select("*")
+    .eq("id", sourceId)
+    .single();
+  if (srcErr) throw srcErr;
+
+  const { data: newTournament, error: insertErr } = await sb
+    .from("tournaments")
+    .insert({
+      tenant_id: tenantId,
+      name: `${source.name} (kopia)`,
+      format: source.format,
+      scheduled_at: null,
+      open_registration: false,
+      max_teams: null,
+      status: "draft",
+      formation: "random",
+      num_groups: 0,
+      games_per_match: 0,
+      total_rounds: 0,
+      current_round: 0,
+    })
+    .select()
+    .single();
+  if (insertErr) throw insertErr;
+
+  const { data: sourceTeams, error: teamsErr } = await sb
+    .from("tournament_teams")
+    .select("player1_id, player2_id")
+    .eq("tournament_id", sourceId);
+  if (teamsErr) throw teamsErr;
+
+  if (sourceTeams && sourceTeams.length > 0) {
+    const { error: copyErr } = await sb.from("tournament_teams").insert(
+      sourceTeams.map((t) => ({
+        tournament_id: newTournament.id,
+        group_id: null,
+        player1_id: t.player1_id,
+        player2_id: t.player2_id,
+        seed: null,
+      }))
+    );
+    if (copyErr) throw copyErr;
+  }
+
+  return newTournament as Tournament;
+}

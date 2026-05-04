@@ -624,9 +624,26 @@ function PlayoffPanel({
 
   const byes = byeCount(groupStandings);
   const [byeGroupIds, setByeGroupIds] = useState<Set<string>>(new Set());
-  const [selectedCourts, setSelectedCourts] = useState<Set<string>>(new Set(courts.map((c) => c.id)));
   const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const recommendedCount = useMemo(() => {
+    if (isFirstRound) {
+      const totalAdvancing = groupStandings.reduce((s, g) => s + g.standings.length, 0);
+      return Math.floor((totalAdvancing - byes) / 2);
+    }
+    if (lastCompletedKOStage === "semi_final") {
+      return 1 + (hasBronze ? 1 : 0);
+    }
+    const completedStageMatches = koMatches.filter(
+      (m) => m.stage === lastCompletedKOStage && m.status === "completed"
+    );
+    return Math.ceil(completedStageMatches.length / 2);
+  }, [isFirstRound, groupStandings, byes, koMatches, lastCompletedKOStage, hasBronze]);
+
+  const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
+    () => new Set(courts.slice(0, recommendedCount).map((c) => c.id))
+  );
 
   const chosenCourts = courts.filter((c) => selectedCourts.has(c.id));
 
@@ -762,7 +779,24 @@ function PlayoffPanel({
 
       {/* Court selection */}
       <div className="mb-4">
-        <p className="text-xs font-medium text-zinc-500 mb-2">Banor för slutspelsrundan:</p>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <p className="text-xs font-medium text-zinc-500">Banor för slutspelsrundan:</p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-400">
+              Rekommenderat: {recommendedCount} {recommendedCount === 1 ? "bana" : "banor"} (en per match)
+            </span>
+            {selectedCourts.size !== recommendedCount && (
+              <button
+                onClick={() =>
+                  setSelectedCourts(new Set(courts.slice(0, recommendedCount).map((c) => c.id)))
+                }
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+              >
+                Återställ
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           {courts.map((c) => {
             const checked = selectedCourts.has(c.id);

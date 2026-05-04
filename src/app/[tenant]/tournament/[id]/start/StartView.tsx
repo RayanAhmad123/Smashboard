@@ -34,6 +34,48 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+type Preset = { groups: number; advances: number };
+
+function getPresets(n: number): Preset[] {
+  const out: Preset[] = [];
+  if (n < 4) return out;
+
+  const feasible = (g: number, a: number) =>
+    g >= 1 && a >= 1 && g <= n && a <= Math.floor(n / g);
+
+  // 4-5 teams: 2 groups, 1 advances → straight Final
+  if (n <= 5 && feasible(2, 1)) out.push({ groups: 2, advances: 1 });
+
+  // 6-8 teams: 2 groups × 2 → 4-team SF
+  if (n >= 6 && n <= 8 && feasible(2, 2)) out.push({ groups: 2, advances: 2 });
+
+  // 8 teams: also allow 4 groups × 2 → 8-team QF
+  if (n === 8 && feasible(4, 2)) out.push({ groups: 4, advances: 2 });
+
+  // 9-10 teams: 2 groups × 2 → 4-team SF
+  if (n >= 9 && n <= 10 && feasible(2, 2)) out.push({ groups: 2, advances: 2 });
+
+  // 9+ teams: 3 groups × 2 → 6 advancing (SF with 2 byes)
+  if (n >= 9 && n <= 12 && feasible(3, 2)) out.push({ groups: 3, advances: 2 });
+
+  // 10+ teams: 4 groups × 2 → 8-team QF (the standard padel format)
+  if (n >= 10 && feasible(4, 2)) out.push({ groups: 4, advances: 2 });
+
+  // Large fields (21+): also offer 6 groups × 2 → 12 advancing (QF + byes)
+  if (n >= 21 && feasible(6, 2)) out.push({ groups: 6, advances: 2 });
+
+  // Deduplicate by (groups, advances)
+  return out.filter(
+    (p, i, arr) => arr.findIndex((q) => q.groups === p.groups && q.advances === p.advances) === i
+  );
+}
+
+function stageLabel(total: number): string {
+  if (total <= 2) return "Final";
+  if (total <= 4) return "SF → Final";
+  return "QF → SF → Final";
+}
+
 export function StartView({
   tenant,
   tournament,
@@ -71,7 +113,7 @@ export function StartView({
   const [advancesPerGroup, setAdvancesPerGroup] = useState(0);
   const [hasBronze, setHasBronze] = useState(false);
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
-    new Set(courts.map((c) => c.id))
+    new Set<string>()
   );
   // Per-court group index (which group plays on this court). Default: round-robin
   // across the initial numGroups so each group gets at least one court out of the
@@ -377,6 +419,42 @@ export function StartView({
 
         <section className="rounded-xl border border-zinc-200 bg-white p-4 space-y-4">
           <h2 className="text-sm font-semibold text-zinc-700">Inställningar</h2>
+
+          {fullTeamCount >= 4 && (() => {
+            const presets = getPresets(fullTeamCount);
+            if (presets.length === 0) return null;
+            return (
+              <div>
+                <p className="text-xs font-medium text-zinc-500 mb-2">Rekommenderat upplägg</p>
+                <div className="flex flex-wrap gap-2">
+                  {presets.map((p) => {
+                    const total = p.groups * p.advances;
+                    const active = numGroups === p.groups && advancesPerGroup === p.advances;
+                    return (
+                      <button
+                        key={`${p.groups}-${p.advances}`}
+                        type="button"
+                        onClick={() => {
+                          setNumGroups(p.groups);
+                          setAdvancesPerGroup(p.advances);
+                          if (p.advances === 0) setHasBronze(false);
+                        }}
+                        className="px-3 py-1.5 rounded-full border text-xs font-medium transition"
+                        style={active
+                          ? { backgroundColor: accent, borderColor: accent, color: "#fff" }
+                          : { borderColor: "#d4d4d8", color: "#52525b" }
+                        }
+                      >
+                        {p.groups} grupper × {p.advances} vidare
+                        <span className="ml-1.5 opacity-70">· {stageLabel(total)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div>
             <label className="text-xs font-medium block mb-1 text-zinc-500">
               Antal grupper: {numGroups}

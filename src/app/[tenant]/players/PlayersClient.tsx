@@ -24,24 +24,27 @@ export function PlayersClient({
   const accent = tenant.primary_color || "#10b981";
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [level, setLevel] = useState(5.0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function addPlayer() {
-    if (!name.trim()) return;
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (!fullName) return;
     setBusy(true);
     setErr(null);
     try {
       const p = await upsertPlayer({
         tenant_id: tenant.id,
-        name: name.trim(),
+        name: fullName,
         level,
         active: true,
       });
       setPlayers((prev) => [...prev, p].sort((a, b) => a.name.localeCompare(b.name)));
-      setName("");
+      setFirstName("");
+      setLastName("");
       setLevel(5.0);
       setAdding(false);
     } catch (e) {
@@ -99,14 +102,24 @@ export function PlayersClient({
       {adding && (
         <div className="mx-4 sm:mx-8 mt-6 p-4 rounded-lg border border-zinc-200 bg-white flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
-            <label className="text-xs text-zinc-500 block mb-1">Namn</label>
+            <label className="text-xs text-zinc-500 block mb-1">Förnamn</label>
             <input
               autoFocus
               className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPlayer()}
-              placeholder="Förnamn Efternamn"
+              placeholder="Förnamn"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-zinc-500 block mb-1">Efternamn</label>
+            <input
+              className="w-full px-3 py-2 rounded-md border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPlayer()}
+              placeholder="Efternamn"
             />
           </div>
           <div className="sm:w-32">
@@ -126,7 +139,7 @@ export function PlayersClient({
           <button
             className="px-4 py-2 rounded-md text-white text-sm font-medium disabled:opacity-50"
             style={{ backgroundColor: accent }}
-            disabled={busy || !name.trim()}
+            disabled={busy || !firstName.trim()}
             onClick={addPlayer}
           >
             Spara

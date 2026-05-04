@@ -46,10 +46,7 @@ export function shortName(player: Player | undefined | null): string {
   if (!player) return "?";
   const parts = player.name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0];
-  const first = parts[0];
-  const last = parts[parts.length - 1];
-  const abbr = last.length > 3 ? last.slice(0, 3) + "." : last;
-  return `${first} ${abbr}`;
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
 }
 
 export function shortTeamName(

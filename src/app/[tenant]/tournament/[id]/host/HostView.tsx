@@ -575,7 +575,9 @@ function HostInner({
                         </tr>
                       </thead>
                       <tbody>
-                        {standings.map((s, i) => (
+                        {standings.map((s, i) => {
+                          const t = teamMap.get(s.team_id);
+                          return (
                           <tr
                             key={s.team_id}
                             className="border-t border-zinc-100 dark:border-zinc-800"
@@ -583,7 +585,7 @@ function HostInner({
                             <td className="px-2 py-2 text-center text-zinc-500">
                               {i + 1}
                             </td>
-                            <td className="px-3 py-2">{s.teamName}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{t ? shortTeamName(t, playerMap) : s.teamName}</td>
                             <td className="px-2 py-2 text-center">{s.mp}</td>
                             <td className="px-2 py-2 text-center">{s.gf}</td>
                             <td className="px-2 py-2 text-center">{s.ga}</td>
@@ -591,7 +593,8 @@ function HostInner({
                               {s.gd > 0 ? `+${s.gd}` : s.gd}
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -929,8 +932,8 @@ function MatchCard({
     }
   };
 
-  const team1Label = teamName(team1, playerMap);
-  const team2Label = teamName(team2, playerMap);
+  const team1Label = shortTeamName(team1, playerMap);
+  const team2Label = shortTeamName(team2, playerMap);
   const inputClass =
     "w-12 h-9 rounded border-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-base font-semibold text-center tabular-nums focus:outline-none focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 disabled:opacity-50";
 
@@ -1037,8 +1040,8 @@ function WaitingCard({
   const s2 = match.score_team2 ?? 0;
   const team1Won = s1 > s2;
   const team2Won = s2 > s1;
-  const team1Label = teamName(team1, playerMap);
-  const team2Label = teamName(team2, playerMap);
+  const team1Label = shortTeamName(team1, playerMap);
+  const team2Label = shortTeamName(team2, playerMap);
   return (
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/40 p-2.5 opacity-70">
       <div className="flex justify-between items-center text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">

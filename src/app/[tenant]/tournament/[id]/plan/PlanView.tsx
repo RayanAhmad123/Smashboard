@@ -270,7 +270,7 @@ export function PlanView({
         ]
           .filter(Boolean)
           .join(" & "),
-        paid: t.paid_at !== null,
+        paid: t.paid_at != null,
       })),
     [teams, playerMap]
   );

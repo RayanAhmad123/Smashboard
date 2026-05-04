@@ -177,6 +177,13 @@ function OpenList({
   accent: string;
   items: OpenItem[];
 }) {
+  const [registeredIds, setRegisteredIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const bookings = loadBookings(tenant.slug);
+    setRegisteredIds(new Set(bookings.map((b) => b.tournamentId)));
+  }, [tenant.slug]);
+
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-12 text-center text-sm text-zinc-500">
@@ -192,32 +199,68 @@ function OpenList({
         const cap = t.max_teams ?? 0;
         const left = Math.max(0, cap - takenSlots);
         const full = left === 0;
+        const registered = registeredIds.has(t.id);
         return (
           <li key={t.id}>
             <Link
               href={`/${tenant.slug}/play/${t.id}`}
-              className="block rounded-xl border border-zinc-200 bg-white p-4 active:scale-[0.99] transition"
+              className="block rounded-xl border p-4 active:scale-[0.99] transition"
+              style={
+                registered
+                  ? { borderColor: accent, backgroundColor: `${accent}08` }
+                  : { borderColor: "#e4e4e7", backgroundColor: "#fff" }
+              }
             >
-              <div className="flex items-baseline justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold text-zinc-900 truncate">
                   {t.name}
                 </h2>
-                <span
-                  className="text-xs font-semibold shrink-0"
-                  style={{ color: full ? "#a1a1aa" : accent }}
-                >
-                  {full ? "Reservlista" : `${left} platser kvar`}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {registered && (
+                    <span
+                      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: `${accent}20`, color: accent }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        className="w-3 h-3"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Anmäld
+                    </span>
+                  )}
+                  {!registered && (
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: full ? "#a1a1aa" : accent }}
+                    >
+                      {full ? "Reservlista" : `${left} platser kvar`}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="mt-1 text-xs text-zinc-500">
                 {FORMAT_LABEL[t.format] ?? t.format} ·{" "}
                 {formatScheduled(t.scheduled_at)}
+                {registered && !full && (
+                  <span className="ml-2" style={{ color: accent }}>
+                    · {left} platser kvar
+                  </span>
+                )}
               </div>
               <div
                 className="mt-3 inline-flex items-center gap-1 text-sm font-medium"
                 style={{ color: accent }}
               >
-                Anmäl dig →
+                {registered ? "Se din anmälan →" : "Anmäl dig →"}
               </div>
             </Link>
           </li>

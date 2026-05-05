@@ -8,6 +8,7 @@ export async function getPlayersByTenant(tenantId: string): Promise<Player[]> {
     .from("players")
     .select("*")
     .eq("tenant_id", tenantId)
+    .neq("from_public_registration", true)
     .order("name");
   if (error) throw error;
   return (data ?? []) as Player[];
@@ -18,6 +19,7 @@ export async function getPlayersByTenantClient(tenantId: string): Promise<Player
     .from("players")
     .select("*")
     .eq("tenant_id", tenantId)
+    .neq("from_public_registration", true)
     .order("name");
   if (error) throw error;
   return (data ?? []) as Player[];

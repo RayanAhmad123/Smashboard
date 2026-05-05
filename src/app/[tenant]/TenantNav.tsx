@@ -13,7 +13,7 @@ type Props = {
 
 export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
   const pathname = usePathname();
-  if (pathname?.includes("/tournament/") && pathname.endsWith("/display")) {
+  if (pathname?.includes("/tournament/") && (pathname.endsWith("/display") || pathname.endsWith("/play"))) {
     return null;
   }
   if (

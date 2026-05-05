@@ -279,6 +279,27 @@ function Dashboard({
 
   const myGroup = data.groups.find((g) => g.id === myGroupId);
 
+  // Detect if any team in the current match is still finishing an earlier round
+  const blockingTeams = useMemo(() => {
+    if (!currentMatch) return [];
+    const blocking: TournamentTeam[] = [];
+    for (const teamId of [currentMatch.team1_id, currentMatch.team2_id]) {
+      const stillBusy = data.matches.some(
+        (m) =>
+          m.round_number < currentMatch.round_number &&
+          m.status !== "completed" &&
+          (m.team1_id === teamId || m.team2_id === teamId)
+      );
+      if (stillBusy) {
+        const t = teamMap.get(teamId);
+        if (t) blocking.push(t);
+      }
+    }
+    return blocking;
+  }, [currentMatch, data.matches, teamMap]);
+
+  const isLocked = blockingTeams.length > 0;
+
   if (!myTeam) return null;
 
   return (
@@ -295,6 +316,8 @@ function Dashboard({
             courtMap={courtMap}
             gamesPerMatch={tournament.games_per_match}
             accent={accent}
+            isLocked={isLocked}
+            blockingTeams={blockingTeams}
           />
         ) : (
           <EmptyCard>Du vilar denna runda.</EmptyCard>
@@ -374,6 +397,8 @@ function MatchCard({
   courtMap,
   gamesPerMatch,
   accent,
+  isLocked,
+  blockingTeams,
 }: {
   match: TournamentMatch;
   myTeamId: string;
@@ -382,6 +407,8 @@ function MatchCard({
   courtMap: Map<string, Court>;
   gamesPerMatch: number;
   accent: string;
+  isLocked: boolean;
+  blockingTeams: TournamentTeam[];
 }) {
   const iAmTeam1 = match.team1_id === myTeamId;
   const opponentId = iAmTeam1 ? match.team2_id : match.team1_id;
@@ -394,9 +421,12 @@ function MatchCard({
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-      {/* Court badge */}
-      <div className="px-4 pt-3 pb-1 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-zinc-400">
+      {/* Court — prominent banner */}
+      <div
+        className="px-4 py-3 flex items-center justify-between gap-2"
+        style={{ backgroundColor: `${accent}12` }}
+      >
+        <span className="text-xl font-black tracking-tight" style={{ color: accent }}>
           {court ? court.name : "Bana okänd"}
         </span>
         {reported ? (
@@ -405,6 +435,10 @@ function MatchCard({
             style={{ backgroundColor: `${accent}18`, color: accent }}
           >
             Rapporterat
+          </span>
+        ) : isLocked ? (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+            Väntar
           </span>
         ) : (
           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
@@ -438,8 +472,23 @@ function MatchCard({
         </div>
       </div>
 
-      {/* Score form */}
-      {!reported && (
+      {/* Locked — waiting for another match to finish */}
+      {!reported && isLocked && (
+        <div className="border-t border-amber-100 bg-amber-50 px-4 py-4 flex items-start gap-3">
+          <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true">
+            <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Väntar på pågående match</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {blockingTeams.map((t) => shortTeamName(t, playerMap)).join(" & ")} spelar fortfarande sin föregående match.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Score form — only when not reported and not locked */}
+      {!reported && !isLocked && (
         <div className="border-t border-zinc-100 px-4 py-4">
           <ScoreForm
             match={match}

@@ -668,6 +668,12 @@ function Header({
   completed: number;
   total: number;
 }) {
+  const [playUrl, setPlayUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlayUrl(`${window.location.origin}/${tenant.slug}/tournament/${tournament.id}/play`);
+  }, [tenant.slug, tournament.id]);
+
   return (
     <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-zinc-200">
       <div className="flex items-center gap-3 min-w-0">
@@ -723,6 +729,17 @@ function Header({
       </div>
 
       <div className="flex items-center gap-[1.5vw] shrink-0">
+        {playUrl && (
+          <div className="flex items-center gap-[0.6vw]">
+            <div style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.88rem)" }} className="text-zinc-400 leading-tight text-right">
+              <p className="font-semibold text-zinc-500">Rapportera</p>
+              <p>Skanna &amp; välj ditt lag</p>
+            </div>
+            <div className="bg-white rounded-lg p-[3px]" style={{ width: "clamp(56px, 6.5vw, 88px)", height: "clamp(56px, 6.5vw, 88px)" }}>
+              <QRCode value={playUrl} style={{ width: "100%", height: "100%" }} />
+            </div>
+          </div>
+        )}
         <div className="hidden sm:flex flex-col items-end gap-1">
           <div className="flex items-center gap-1.5">
             <span
@@ -1381,12 +1398,6 @@ function Footer({
   hasKO: boolean;
   tournamentDone: boolean;
 }) {
-  const [playUrl, setPlayUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPlayUrl(`${window.location.origin}/${tenant.slug}/tournament/${tournament.id}/play`);
-  }, [tenant.slug, tournament.id]);
-
   return (
     <footer className="px-[2vw] py-[0.7vh] border-t border-zinc-200 flex items-center justify-between gap-3">
       <div
@@ -1405,25 +1416,11 @@ function Footer({
         <span className="text-zinc-300">·</span>
         <span className="tabular-nums">Uppdaterad {timeLabel}</span>
       </div>
-
-      <div className="flex items-center gap-[1.2vw] shrink-0">
-        {playUrl && (
-          <div className="flex items-center gap-[0.8vw]">
-            <div className="bg-white rounded-lg p-[3px]" style={{ width: "clamp(56px, 6.5vw, 88px)", height: "clamp(56px, 6.5vw, 88px)" }}>
-              <QRCode value={playUrl} style={{ width: "100%", height: "100%" }} />
-            </div>
-            <div style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.88rem)" }} className="text-zinc-400 leading-tight">
-              <p className="font-semibold text-zinc-500">Rapportera</p>
-              <p>Skanna &amp; välj ditt lag</p>
-            </div>
-          </div>
-        )}
-        <div
-          className="text-zinc-400 uppercase tracking-widest font-semibold"
-          style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
-        >
-          smashboard
-        </div>
+      <div
+        className="text-zinc-400 uppercase tracking-widest font-semibold"
+        style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.85rem)" }}
+      >
+        smashboard
       </div>
     </footer>
   );

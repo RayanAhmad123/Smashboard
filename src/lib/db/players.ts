@@ -56,3 +56,8 @@ export async function setPlayerLevel(id: string, level: number): Promise<void> {
     .eq("id", id);
   if (error) throw error;
 }
+
+export async function deletePlayer(id: string): Promise<void> {
+  const { error } = await supabaseClient.from("players").delete().eq("id", id);
+  if (error) throw error;
+}

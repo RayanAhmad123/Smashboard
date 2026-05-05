@@ -6,6 +6,7 @@ import {
   upsertPlayer,
   setPlayerActive,
   setPlayerLevel,
+  deletePlayer,
 } from "@/lib/db/players";
 
 const LEVEL_OPTIONS = (() => {
@@ -74,6 +75,17 @@ export function PlayersClient({
       await setPlayerLevel(p.id, newLevel);
     } catch (e) {
       setErr((e as Error).message);
+    }
+  }
+
+  async function removePlayer(p: Player) {
+    if (!confirm(`Ta bort ${p.name}? Det går inte att ångra.`)) return;
+    setPlayers((prev) => prev.filter((x) => x.id !== p.id));
+    try {
+      await deletePlayer(p.id);
+    } catch (e) {
+      setErr((e as Error).message);
+      setPlayers((prev) => [...prev, p].sort((a, b) => a.name.localeCompare(b.name)));
     }
   }
 
@@ -155,12 +167,13 @@ export function PlayersClient({
                 <th className="px-4 py-3 font-medium">Namn</th>
                 <th className="px-4 py-3 font-medium w-40">Nivå</th>
                 <th className="px-4 py-3 font-medium w-32">Aktiv</th>
+                <th className="px-4 py-3 font-medium w-16"></th>
               </tr>
             </thead>
             <tbody>
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={4} className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Inga spelare än. Lägg till några för att komma igång.
                   </td>
                 </tr>
@@ -195,6 +208,19 @@ export function PlayersClient({
                         {p.active ? "Aktiv" : "Inaktiv"}
                       </span>
                     </label>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => removePlayer(p)}
+                      className="text-zinc-400 hover:text-red-600 transition-colors"
+                      aria-label={`Ta bort ${p.name}`}
+                      title="Ta bort spelare"
+                    >
+                      <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                        <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .787-.712Z" clipRule="evenodd" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               ))}

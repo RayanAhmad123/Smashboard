@@ -43,7 +43,9 @@ function extractTenant(host: string | null): string | null {
 function isPublicTenantPath(pathname: string): boolean {
   if (pathname === "/login" || pathname === "/auth/callback") return true;
   if (pathname === "/auth/signout") return true;
-  if (pathname.startsWith("/play")) return true;
+  // /play and /{tenant}/play — the latter occurs when links include the tenant
+  // slug on subdomains (browser sends /bonpadel/play/... to the middleware).
+  if (pathname.startsWith("/play") || /^\/[^/]+\/play(\/|$)/.test(pathname)) return true;
   // /[tenant]/tournament/[id]/display is public — but in middleware we
   // operate on the un-rewritten path (already relative to tenant root)
   if (/^\/tournament\/[^/]+\/display\/?$/.test(pathname)) return true;

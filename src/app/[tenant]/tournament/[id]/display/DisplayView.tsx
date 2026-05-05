@@ -427,7 +427,7 @@ export function DisplayView({
               </div>
             </div>
             {computed.hasGroups && (
-              <aside className="w-[22vw] max-w-[420px] min-w-[240px] shrink-0">
+              <aside className="w-[17vw] max-w-[320px] min-w-[180px] shrink-0">
                 <StandingsColumn
                   groups={data.groups}
                   teams={data.teams}
@@ -454,7 +454,7 @@ export function DisplayView({
   );
 }
 
-// --- Resting chip (group phase) ---
+// --- Resting cards (group phase) ---
 function RestingChip({
   teamIds,
   teamMap,
@@ -467,37 +467,36 @@ function RestingChip({
   accent: string;
 }) {
   return (
-    <div className="flex items-center gap-[1vw] rounded-xl overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${accent}18 0%, ${accent}08 100%)`,
-        border: `1.5px solid ${accent}33`,
-        padding: "clamp(0.3rem, 0.5vh, 0.6rem) clamp(0.6rem, 1vw, 1.2rem)",
-      }}
-    >
+    <div className="flex items-center gap-[1vw]">
       <span
         className="shrink-0 font-bold uppercase tracking-wider"
         style={{ fontSize: "clamp(0.55rem, 0.75vw, 0.9rem)", color: accent }}
       >
         Vilar
       </span>
-      <span
-        className="inline-block w-px bg-current opacity-20 self-stretch"
-        style={{ color: accent }}
-      />
-      <div className="flex flex-wrap gap-x-[1.5vw] gap-y-[0.4vh]">
+      <div className="flex flex-wrap gap-[0.6vw]">
         {teamIds.map((tid) => {
           const t = teamMap.get(tid);
           if (!t) return null;
           const p1 = playerMap.get(t.player1_id);
           const p2 = t.player2_id ? playerMap.get(t.player2_id) : null;
           return (
-            <span
+            <div
               key={tid}
-              className="font-semibold text-zinc-700"
-              style={{ fontSize: "clamp(0.65rem, 0.9vw, 1.1rem)" }}
+              className="rounded-xl"
+              style={{
+                background: `linear-gradient(135deg, ${accent}18 0%, ${accent}08 100%)`,
+                border: `1.5px solid ${accent}33`,
+                padding: "clamp(0.25rem, 0.4vh, 0.5rem) clamp(0.5rem, 0.8vw, 1rem)",
+              }}
             >
-              {shortName(p1)}{p2 ? ` & ${shortName(p2)}` : ""}
-            </span>
+              <span
+                className="font-semibold text-zinc-700"
+                style={{ fontSize: "clamp(0.65rem, 0.9vw, 1.1rem)" }}
+              >
+                {shortName(p1)}{p2 ? ` & ${shortName(p2)}` : ""}
+              </span>
+            </div>
           );
         })}
       </div>
@@ -669,8 +668,6 @@ function Header({
   completed: number;
   total: number;
 }) {
-  const totalRounds = tournament.total_rounds || 0;
-  const currentRound = tournament.current_round;
   return (
     <header className="px-[2vw] pt-[1.2vh] pb-[1vh] flex items-center justify-between gap-6 border-b border-zinc-200">
       <div className="flex items-center gap-3 min-w-0">
@@ -726,26 +723,6 @@ function Header({
       </div>
 
       <div className="flex items-center gap-[1.5vw] shrink-0">
-        <div className="text-right">
-          <div
-            className="uppercase tracking-widest text-zinc-500 font-semibold"
-            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
-          >
-            Runda
-          </div>
-          <div
-            className="font-black tabular-nums leading-none"
-            style={{
-              fontSize: "clamp(1.4rem, 2.4vw, 2.6rem)",
-              color: accent,
-            }}
-          >
-            {currentRound}
-            <span className="text-zinc-300 font-bold">
-              /{totalRounds || "–"}
-            </span>
-          </div>
-        </div>
         <div className="hidden sm:flex flex-col items-end gap-1">
           <div className="flex items-center gap-1.5">
             <span
@@ -759,38 +736,9 @@ function Header({
               Live · {timeLabel}
             </span>
           </div>
-          {totalRounds > 0 && (
-            <div
-              className="flex items-center gap-1"
-              title={`Runda ${currentRound} av ${totalRounds}`}
-            >
-              {Array.from({ length: totalRounds }).map((_, i) => {
-                const done = i < currentRound - 1;
-                const active = i === currentRound - 1;
-                return (
-                  <span
-                    key={i}
-                    className="rounded-full"
-                    style={{
-                      width: "clamp(1rem, 1.4vw, 1.8rem)",
-                      height: "clamp(0.3rem, 0.45vw, 0.55rem)",
-                      backgroundColor: done
-                        ? accent
-                        : active
-                          ? `${accent}80`
-                          : "#e4e4e7",
-                      boxShadow: active
-                        ? `0 0 0 2px ${accent}33`
-                        : undefined,
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
           <div
             className="text-zinc-500 tabular-nums"
-            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem) " }}
+            style={{ fontSize: "clamp(0.55rem, 0.7vw, 0.85rem)" }}
           >
             {completed} / {total} matcher
           </div>
@@ -1452,7 +1400,7 @@ function Footer({
             ? "Avslutad"
             : hasKO
               ? "Slutspel"
-              : `Runda ${tournament.current_round} av ${tournament.total_rounds || "–"}`}
+              : "Pågående"}
         </span>
         <span className="text-zinc-300">·</span>
         <span className="tabular-nums">Uppdaterad {timeLabel}</span>
@@ -1460,11 +1408,11 @@ function Footer({
 
       <div className="flex items-center gap-[1.2vw] shrink-0">
         {playUrl && (
-          <div className="flex items-center gap-[0.6vw]">
-            <div className="bg-white rounded p-[2px]" style={{ width: "clamp(28px, 3.2vw, 48px)", height: "clamp(28px, 3.2vw, 48px)" }}>
+          <div className="flex items-center gap-[0.8vw]">
+            <div className="bg-white rounded-lg p-[3px]" style={{ width: "clamp(56px, 6.5vw, 88px)", height: "clamp(56px, 6.5vw, 88px)" }}>
               <QRCode value={playUrl} style={{ width: "100%", height: "100%" }} />
             </div>
-            <div style={{ fontSize: "clamp(0.4rem, 0.55vw, 0.7rem)" }} className="text-zinc-400 leading-tight">
+            <div style={{ fontSize: "clamp(0.5rem, 0.7vw, 0.88rem)" }} className="text-zinc-400 leading-tight">
               <p className="font-semibold text-zinc-500">Rapportera</p>
               <p>Skanna &amp; välj ditt lag</p>
             </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Court, Tenant } from "@/lib/supabase/types";
-import { updateTenant } from "@/lib/db/tenants";
+import { updateTenant, uploadLogo } from "@/lib/db/tenants";
 import {
   addCourt,
   deleteCourt,
@@ -19,10 +19,30 @@ export function SettingsClient({
 }) {
   const [name, setName] = useState(tenant.name);
   const [color, setColor] = useState(tenant.primary_color || "#10b981");
-  const [logo, setLogo] = useState(tenant.logo_url || "");
-  const [logoDark, setLogoDark] = useState(tenant.logo_url_dark || "");
+
+  // logo_url — current saved URL + pending file to upload
+  const [logoUrl, setLogoUrl] = useState(tenant.logo_url || "");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState(tenant.logo_url || "");
+
+  // logo_url_dark — same pattern
+  const [logoDarkUrl, setLogoDarkUrl] = useState(tenant.logo_url_dark || "");
+  const [logoDarkFile, setLogoDarkFile] = useState<File | null>(null);
+  const [logoDarkPreview, setLogoDarkPreview] = useState(tenant.logo_url_dark || "");
+
   const [savedTenant, setSavedTenant] = useState(false);
   const [savingTenant, setSavingTenant] = useState(false);
+
+  function handleLogoFile(file: File, variant: "light" | "dark") {
+    const preview = URL.createObjectURL(file);
+    if (variant === "light") {
+      setLogoFile(file);
+      setLogoPreview(preview);
+    } else {
+      setLogoDarkFile(file);
+      setLogoDarkPreview(preview);
+    }
+  }
 
   const [courts, setCourts] = useState<Court[]>(initialCourts);
   const [newCourt, setNewCourt] = useState("");
@@ -36,11 +56,25 @@ export function SettingsClient({
     setErr(null);
     setSavedTenant(false);
     try {
+      let finalLogoUrl = logoUrl;
+      let finalLogoDarkUrl = logoDarkUrl;
+
+      if (logoFile) {
+        finalLogoUrl = await uploadLogo(tenant.id, logoFile, "light");
+        setLogoUrl(finalLogoUrl);
+        setLogoFile(null);
+      }
+      if (logoDarkFile) {
+        finalLogoDarkUrl = await uploadLogo(tenant.id, logoDarkFile, "dark");
+        setLogoDarkUrl(finalLogoDarkUrl);
+        setLogoDarkFile(null);
+      }
+
       await updateTenant(tenant.id, {
         name: name.trim(),
         primary_color: color,
-        logo_url: logo.trim() || null,
-        logo_url_dark: logoDark.trim() || null,
+        logo_url: finalLogoUrl || null,
+        logo_url_dark: finalLogoDarkUrl || null,
       });
       setSavedTenant(true);
       setTimeout(() => setSavedTenant(false), 2000);
@@ -151,20 +185,21 @@ export function SettingsClient({
                 className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
               />
             </Field>
-            <Field label="Logo URL (ljust läge)">
-              <input
-                value={logo}
-                onChange={(e) => setLogo(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            <Field label="Logo (ljust läge)">
+              <LogoUpload
+                preview={logoPreview}
+                file={logoFile}
+                onChange={(f) => handleLogoFile(f, "light")}
+                onClear={() => { setLogoFile(null); setLogoPreview(""); setLogoUrl(""); }}
               />
             </Field>
-            <Field label="Logo URL (mörkt läge)">
-              <input
-                value={logoDark}
-                onChange={(e) => setLogoDark(e.target.value)}
-                placeholder="https://... (vit/ljus version)"
-                className="w-full px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            <Field label="Logo (mörkt läge)">
+              <LogoUpload
+                preview={logoDarkPreview}
+                file={logoDarkFile}
+                onChange={(f) => handleLogoFile(f, "dark")}
+                onClear={() => { setLogoDarkFile(null); setLogoDarkPreview(""); setLogoDarkUrl(""); }}
+                darkBg
               />
             </Field>
             <Field label="Primärfärg">
@@ -285,6 +320,76 @@ export function SettingsClient({
             </ul>
           )}
         </section>
+      </div>
+    </div>
+  );
+}
+
+function LogoUpload({
+  preview,
+  file,
+  onChange,
+  onClear,
+  darkBg = false,
+}: {
+  preview: string;
+  file: File | null;
+  onChange: (f: File) => void;
+  onClear: () => void;
+  darkBg?: boolean;
+}) {
+  const inputId = darkBg ? "logo-dark-upload" : "logo-light-upload";
+  return (
+    <div className="flex items-center gap-3">
+      {/* Preview box */}
+      <div
+        className={`h-14 w-24 rounded-md border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden ${
+          darkBg ? "bg-zinc-800" : "bg-white dark:bg-zinc-800"
+        }`}
+      >
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="Logo" className="max-h-12 max-w-full object-contain" />
+        ) : (
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">Ingen</span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5 min-w-0">
+        <label
+          htmlFor={inputId}
+          className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          {file ? "Byt bild" : preview ? "Byt bild" : "Välj bild"}
+        </label>
+        <input
+          id={inputId}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onChange(f);
+            e.target.value = "";
+          }}
+        />
+        {(preview || file) && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-zinc-400 dark:text-zinc-500 hover:text-red-500 text-left"
+          >
+            Ta bort logo
+          </button>
+        )}
+        {file && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[12rem]">
+            {file.name}
+          </p>
+        )}
       </div>
     </div>
   );

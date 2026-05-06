@@ -500,13 +500,17 @@ function HostInner({
     // advancement courts can be on different rounds simultaneously, so we can't
     // rely on a single currentRound value.
     const displayedRounds = new Set<number>();
+    const playingTeamIds = new Set<string>();
     for (const m of matchByCourt.values()) {
       displayedRounds.add(m.round_number);
+      if (m.team1_id) playingTeamIds.add(m.team1_id);
+      if (m.team2_id) playingTeamIds.add(m.team2_id);
     }
     if (displayedRounds.size === 0) return [];
     return rests
       .filter((r) => displayedRounds.has(r.round_number))
-      .map((r) => r.team_id);
+      .map((r) => r.team_id)
+      .filter((id) => !playingTeamIds.has(id));
   }, [rests, matchByCourt]);
 
   // Play-in matches have stage "quarter_final" but should be labeled "Inledningsrunda"

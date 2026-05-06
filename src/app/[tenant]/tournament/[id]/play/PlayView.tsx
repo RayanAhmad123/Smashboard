@@ -286,14 +286,25 @@ function Dashboard({
     );
   }, [data.matches, selectedTeamId]);
 
+  // Mirror the host view's court-based logic: show the team's next unfinished
+  // match regardless of tournament.current_round. Courts advance independently
+  // in group play, so round-based lookup causes the phone to lag behind.
   const currentMatch = useMemo(
-    () => myGroupMatches.find((m) => m.round_number === tournament.current_round),
-    [myGroupMatches, tournament.current_round]
+    () =>
+      myGroupMatches
+        .filter((m) => m.status !== "completed")
+        .sort((a, b) => a.round_number - b.round_number)[0] ?? null,
+    [myGroupMatches]
   );
 
   const upcomingMatches = useMemo(
-    () => myGroupMatches.filter((m) => m.round_number > tournament.current_round).sort((a, b) => a.round_number - b.round_number),
-    [myGroupMatches, tournament.current_round]
+    () =>
+      currentMatch
+        ? myGroupMatches
+            .filter((m) => m.status !== "completed" && m.id !== currentMatch.id)
+            .sort((a, b) => a.round_number - b.round_number)
+        : [],
+    [myGroupMatches, currentMatch]
   );
 
   // standings for my group only
@@ -307,16 +318,19 @@ function Dashboard({
 
   const myGroup = data.groups.find((g) => g.id === myGroupId);
 
-  // Detect if any team in the current match is still finishing an earlier round
+  // Mirror host view: a match is locked only when one of its teams still has
+  // an unfinished match on a DIFFERENT court from an earlier round.
   const blockingTeams = useMemo(() => {
     if (!currentMatch) return [];
     const blocking: TournamentTeam[] = [];
     for (const teamId of [currentMatch.team1_id, currentMatch.team2_id]) {
       const stillBusy = data.matches.some(
         (m) =>
-          m.round_number < currentMatch.round_number &&
+          m.court_id !== currentMatch.court_id &&
+          m.stage === "group" &&
           m.status !== "completed" &&
-          (m.team1_id === teamId || m.team2_id === teamId)
+          (m.team1_id === teamId || m.team2_id === teamId) &&
+          m.round_number < currentMatch.round_number
       );
       if (stillBusy) {
         const t = teamMap.get(teamId);
@@ -334,7 +348,7 @@ function Dashboard({
     <div className="space-y-4">
       {/* Current round match */}
       <section>
-        <SectionLabel>Runda {tournament.current_round}</SectionLabel>
+        <SectionLabel>Runda {currentMatch?.round_number ?? tournament.current_round}</SectionLabel>
         {currentMatch ? (
           <MatchCard
             key={currentMatch.id}

@@ -19,6 +19,7 @@ export default async function TenantLayout({
         name={tenant.name}
         primaryColor={tenant.primary_color}
         logoUrl={tenant.logo_url}
+        logoUrlDark={tenant.logo_url_dark}
       />
       {children}
     </>

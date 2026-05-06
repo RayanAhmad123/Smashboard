@@ -9,9 +9,10 @@ type Props = {
   name: string;
   primaryColor: string | null;
   logoUrl: string | null;
+  logoUrlDark: string | null;
 };
 
-export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
+export function TenantNav({ slug, name, primaryColor, logoUrl, logoUrlDark }: Props) {
   const pathname = usePathname();
   if (pathname?.includes("/tournament/") && (pathname.endsWith("/display") || pathname.endsWith("/play"))) {
     return null;
@@ -41,9 +42,27 @@ export function TenantNav({ slug, name, primaryColor, logoUrl }: Props) {
       {/* Main row */}
       <div className="px-4 py-3 flex items-center gap-3 relative">
         <Link href={base} className="flex items-center gap-2 shrink-0">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="h-7 w-auto" />
+          {logoUrl || logoUrlDark ? (
+            <>
+              {/* Light-mode logo: visible in light, hidden in dark (fall back to dark logo if no light) */}
+              {logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className={`h-7 w-auto ${logoUrlDark ? "dark:hidden" : ""}`}
+                />
+              )}
+              {/* Dark-mode logo: hidden in light, visible in dark (fall back to light logo if no dark) */}
+              {logoUrlDark && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrlDark}
+                  alt=""
+                  className={`h-7 w-auto ${logoUrl ? "hidden dark:block" : ""}`}
+                />
+              )}
+            </>
           ) : (
             <>
               <span

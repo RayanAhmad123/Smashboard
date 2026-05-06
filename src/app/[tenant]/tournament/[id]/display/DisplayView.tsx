@@ -262,16 +262,32 @@ export function DisplayView({
       });
     })();
 
-    // Current group round for resting teams
-    const currentGroupRound = (() => {
-      const incomplete = groupMatches.filter((m) => m.status !== "completed");
-      if (incomplete.length === 0) return null;
-      return Math.min(...incomplete.map((m) => m.round_number));
+    // Resting teams: mirror the host view logic — use the rounds currently shown
+    // on courts and exclude any team that is actively playing. Using a single
+    // global minimum round fails when groups are at different rounds simultaneously.
+    // Also exclude teams that have completed all their group matches (they're done,
+    // not resting — stale round_rests entries can otherwise surface them falsely).
+    const restingTeamIds: string[] = (() => {
+      const displayedRounds = new Set<number>();
+      const playingTeamIds = new Set<string>();
+      for (const m of byCourt.values()) {
+        if (m.stage !== "group") continue;
+        displayedRounds.add(m.round_number);
+        playingTeamIds.add(m.team1_id);
+        playingTeamIds.add(m.team2_id);
+      }
+      if (displayedRounds.size === 0) return [];
+      const teamsWithRemainingMatches = new Set(
+        data.matches
+          .filter((m) => m.stage === "group" && m.status !== "completed")
+          .flatMap((m) => [m.team1_id, m.team2_id])
+      );
+      return data.rests
+        .filter((r) => displayedRounds.has(r.round_number))
+        .map((r) => r.team_id)
+        .filter((id) => !playingTeamIds.has(id))
+        .filter((id) => teamsWithRemainingMatches.has(id));
     })();
-
-    const restingTeamIds: string[] = currentGroupRound
-      ? data.rests.filter((r) => r.round_number === currentGroupRound).map((r) => r.team_id)
-      : [];
 
     // Active KO stage (the incomplete non-bronze stage)
     const activeKOMatches = koMatches.filter(

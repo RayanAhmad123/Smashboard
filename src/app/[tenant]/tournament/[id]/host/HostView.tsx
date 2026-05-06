@@ -665,7 +665,7 @@ function HostInner({
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-3 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 px-6 py-3 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold leading-tight">
             {tournament.name}
@@ -820,11 +820,13 @@ function HostInner({
             <div className="mb-2 flex flex-wrap gap-2">
               {restingTeamIdsThisRound.map((tid) => {
                 const t = teamMap.get(tid);
-                return t ? (
-                  <div key={tid} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
-                    Vilar: {shortTeamName(t, playerMap)}
+                if (!t) return null;
+                const name = shortTeamName(t, playerMap);
+                return (
+                  <div key={tid} title={`Vilar: ${name}`} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 max-w-[14rem] truncate cursor-default">
+                    Vilar: {name}
                   </div>
-                ) : null;
+                );
               })}
             </div>
           )}

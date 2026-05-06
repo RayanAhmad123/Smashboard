@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseClient } from "@/lib/supabase/client";
 import { updateMatchScore } from "@/lib/db/matches";
-import { computeStandings, shortTeamName, teamName } from "@/lib/standings";
+import { computeStandings, shortTeamName, teamName, type TeamStanding } from "@/lib/standings";
 import type {
   Court,
   Player,
@@ -286,6 +286,9 @@ function Dashboard({
     );
   }, [data.matches, selectedTeamId]);
 
+  // True once this team has no remaining group matches.
+  const allGroupMatchesDone = myGroupMatches.length > 0 && myGroupMatches.every((m) => m.status === "completed");
+
   // Mirror the host view's court-based logic: show the team's next unfinished
   // match regardless of tournament.current_round. Courts advance independently
   // in group play, so round-based lookup causes the phone to lag behind.
@@ -318,6 +321,25 @@ function Dashboard({
 
   const myGroup = data.groups.find((g) => g.id === myGroupId);
 
+  // Current active round within this team's group — used to show the right
+  // round number when the team is resting (no current match).
+  const currentGroupRound = useMemo(() => {
+    if (!myGroupId) return tournament.current_round;
+    let r: number | null = null;
+    for (const m of data.matches) {
+      if (m.group_id === myGroupId && m.stage === "group" && m.status !== "completed") {
+        if (r === null || m.round_number < r) r = m.round_number;
+      }
+    }
+    return r ?? tournament.current_round;
+  }, [data.matches, myGroupId, tournament.current_round]);
+
+  // Final position in group standings (1-indexed), used in the end-of-group card.
+  const myPosition = useMemo(
+    () => groupStandings.findIndex((s) => s.team_id === selectedTeamId) + 1 || null,
+    [groupStandings, selectedTeamId]
+  );
+
   // Mirror host view: a match is locked only when one of its teams still has
   // an unfinished match on a DIFFERENT court from an earlier round.
   const blockingTeams = useMemo(() => {
@@ -348,7 +370,9 @@ function Dashboard({
     <div className="space-y-4">
       {/* Current round match */}
       <section>
-        <SectionLabel>Runda {currentMatch?.round_number ?? tournament.current_round}</SectionLabel>
+        {!allGroupMatchesDone && (
+          <SectionLabel>Runda {currentMatch?.round_number ?? currentGroupRound}</SectionLabel>
+        )}
         {currentMatch ? (
           <MatchCard
             key={currentMatch.id}
@@ -361,6 +385,16 @@ function Dashboard({
             accent={accent}
             isLocked={isLocked}
             blockingTeams={blockingTeams}
+          />
+        ) : allGroupMatchesDone ? (
+          <GroupDoneCard
+            position={myPosition}
+            groupName={myGroup?.name ?? "Grupp"}
+            groupStandings={groupStandings}
+            selectedTeamId={selectedTeamId}
+            teamMap={teamMap}
+            playerMap={playerMap}
+            accent={accent}
           />
         ) : (
           <EmptyCard>Du vilar denna runda.</EmptyCard>
@@ -387,8 +421,8 @@ function Dashboard({
         </section>
       )}
 
-      {/* Group standings */}
-      {groupStandings.length > 0 && (
+      {/* Group standings — hidden when GroupDoneCard is shown (it has its own table) */}
+      {groupStandings.length > 0 && !allGroupMatchesDone && (
         <section>
           <SectionLabel>{myGroup?.name ?? "Grupp"} – ställning</SectionLabel>
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
@@ -610,52 +644,24 @@ function ScoreForm({
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">Ange matchresultatet (vinnaren spelar {gamesPerMatch} gem)</p>
+    <div className="space-y-4">
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+        Ange matchresultatet — vinnaren spelar {gamesPerMatch} gem
+      </p>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        {/* My score */}
-        <div className="space-y-1">
-          <label className="text-xs text-zinc-400 dark:text-zinc-500">Ni</label>
-          <input
-            type="number"
-            min="0"
-            max={gamesPerMatch}
-            inputMode="numeric"
-            value={myVal}
-            onChange={(e) => setMyVal(e.target.value)}
-            placeholder="0"
-            className="w-full text-center text-2xl font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 py-3 focus:outline-none focus:ring-2 focus:border-transparent"
-            style={{ "--tw-ring-color": accent } as React.CSSProperties}
-          />
-        </div>
-
-        <span className="text-zinc-300 dark:text-zinc-600 font-bold text-lg mt-5">–</span>
-
-        {/* Opponent score */}
-        <div className="space-y-1">
-          <label className="text-xs text-zinc-400 dark:text-zinc-500 truncate block text-right">{opponentName}</label>
-          <input
-            type="number"
-            min="0"
-            max={gamesPerMatch}
-            inputMode="numeric"
-            value={oppVal}
-            onChange={(e) => setOppVal(e.target.value)}
-            placeholder="0"
-            className="w-full text-center text-2xl font-bold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 py-3 focus:outline-none focus:ring-2 focus:border-transparent"
-            style={{ "--tw-ring-color": accent } as React.CSSProperties}
-          />
-        </div>
+      <div className="flex items-center justify-center gap-4">
+        <ScoreStep label="Ni" value={myVal} onChange={setMyVal} max={gamesPerMatch} accent={accent} />
+        <span className="text-zinc-300 dark:text-zinc-600 font-bold text-xl mt-5">–</span>
+        <ScoreStep label={opponentName} value={oppVal} onChange={setOppVal} max={gamesPerMatch} accent={accent} />
       </div>
 
       {bothFilled && !valid && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-amber-600 text-center">
           Vinnaren måste ha {gamesPerMatch} gem.
         </p>
       )}
 
-      {submitErr && <p className="text-xs text-red-600">{submitErr}</p>}
+      {submitErr && <p className="text-xs text-red-600 text-center">{submitErr}</p>}
 
       <button
         type="button"
@@ -704,6 +710,135 @@ function UpcomingMatchRow({
           mot {opponent ? shortTeamName(opponent, playerMap) : "?"}
         </p>
         {court && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{court.name}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Group done card ──────────────────────────────────────────────────────────
+
+function GroupDoneCard({
+  position,
+  groupName,
+  groupStandings,
+  selectedTeamId,
+  teamMap,
+  playerMap,
+  accent,
+}: {
+  position: number | null;
+  groupName: string;
+  groupStandings: TeamStanding[];
+  selectedTeamId: string;
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="px-4 py-4 text-center" style={{ backgroundColor: `${accent}12` }}>
+        <div className="text-2xl mb-1">🏆</div>
+        <p className="text-sm font-bold" style={{ color: accent }}>
+          Gruppspelet är slut!
+        </p>
+        {position && (
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+            Ni slutade på plats <strong>{position}</strong> i {groupName}
+          </p>
+        )}
+      </div>
+      {groupStandings.length > 0 && (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-zinc-400 dark:text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
+              <th className="pl-3 pr-1 py-2 text-left font-medium w-5">#</th>
+              <th className="px-1 py-2 text-left font-medium">Lag</th>
+              <th className="px-1 py-2 text-right font-medium">M</th>
+              <th className="px-1 py-2 text-right font-medium">+</th>
+              <th className="px-1 py-2 text-right font-medium">−</th>
+              <th className="pr-3 pl-1 py-2 text-right font-medium">+/−</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
+            {groupStandings.map((row, i) => {
+              const isMe = row.team_id === selectedTeamId;
+              const team = teamMap.get(row.team_id);
+              const name = team ? shortTeamName(team, playerMap) : row.teamName;
+              return (
+                <tr
+                  key={row.team_id}
+                  className={isMe ? "font-semibold" : ""}
+                  style={isMe ? { backgroundColor: `${accent}10` } : undefined}
+                >
+                  <td className="pl-3 pr-1 py-2 text-zinc-400 dark:text-zinc-500 text-xs">{i + 1}</td>
+                  <td className="px-1 py-2 min-w-0">
+                    <span className="block truncate" style={isMe ? { color: accent } : undefined}>{name}</span>
+                  </td>
+                  <td className="px-1 py-2 text-right tabular-nums text-zinc-600 dark:text-zinc-400">{row.mp}</td>
+                  <td className="px-1 py-2 text-right tabular-nums text-zinc-600 dark:text-zinc-400">{row.gf}</td>
+                  <td className="px-1 py-2 text-right tabular-nums text-zinc-600 dark:text-zinc-400">{row.ga}</td>
+                  <td className="pr-3 pl-1 py-2 text-right tabular-nums text-zinc-600 dark:text-zinc-400"
+                      style={row.gd > 0 ? { color: accent } : row.gd < 0 ? { color: "#ef4444" } : undefined}>
+                    {row.gd > 0 ? `+${row.gd}` : row.gd}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ─── Score stepper (mobile-friendly +/- control) ─────────────────────────────
+
+function ScoreStep({
+  label,
+  value,
+  onChange,
+  max,
+  accent,
+  alignRight,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  max: number;
+  accent: string;
+  alignRight?: boolean;
+}) {
+  const num = value === "" ? null : parseInt(value, 10);
+  const canDec = num !== null && num > 0;
+  const canInc = num === null || num < max;
+
+  function inc() { onChange(String(Math.min(max, (num ?? 0) + 1))); }
+  function dec() { onChange(String(Math.max(0, (num ?? 0) - 1))); }
+
+  const btnBase =
+    "w-11 h-11 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xl font-bold select-none active:scale-95 transition-transform disabled:opacity-30";
+
+  return (
+    <div className={`flex flex-col items-center gap-1.5 ${alignRight ? "items-end" : ""}`}>
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate max-w-[7rem] text-center">{label}</p>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={dec} disabled={!canDec} className={btnBase}>
+          −
+        </button>
+        <div className="w-12 h-11 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center text-2xl font-bold tabular-nums dark:text-zinc-100">
+          {num === null
+            ? <span className="text-zinc-300 dark:text-zinc-600 text-base">–</span>
+            : num}
+        </div>
+        <button
+          type="button"
+          onClick={inc}
+          disabled={!canInc}
+          className={btnBase}
+          style={{ color: canInc ? accent : undefined }}
+        >
+          +
+        </button>
       </div>
     </div>
   );

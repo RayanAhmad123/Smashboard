@@ -395,29 +395,36 @@ function Dashboard({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-zinc-400 border-b border-zinc-100">
-                  <th className="pl-4 pr-2 py-2 text-left font-medium w-6">#</th>
-                  <th className="px-2 py-2 text-left font-medium">Lag</th>
-                  <th className="px-2 py-2 text-right font-medium">M</th>
-                  <th className="px-2 py-2 text-right font-medium">+</th>
-                  <th className="pr-4 pl-2 py-2 text-right font-medium">−</th>
+                  <th className="pl-3 pr-1 py-2 text-left font-medium w-5">#</th>
+                  <th className="px-1 py-2 text-left font-medium">Lag</th>
+                  <th className="px-1 py-2 text-right font-medium">M</th>
+                  <th className="px-1 py-2 text-right font-medium">+</th>
+                  <th className="px-1 py-2 text-right font-medium">−</th>
+                  <th className="pr-3 pl-1 py-2 text-right font-medium">+/−</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
                 {groupStandings.map((row, i) => {
                   const isMe = row.team_id === selectedTeamId;
+                  const team = teamMap.get(row.team_id);
+                  const name = team ? shortTeamName(team, playerMap) : row.teamName;
                   return (
                     <tr
                       key={row.team_id}
                       className={isMe ? "font-semibold" : ""}
                       style={isMe ? { backgroundColor: `${accent}10` } : undefined}
                     >
-                      <td className="pl-4 pr-2 py-2.5 text-zinc-400 text-xs">{i + 1}</td>
-                      <td className="px-2 py-2.5 truncate max-w-[160px]">
-                        <span style={isMe ? { color: accent } : undefined}>{row.teamName}</span>
+                      <td className="pl-3 pr-1 py-2 text-zinc-400 text-xs">{i + 1}</td>
+                      <td className="px-1 py-2 min-w-0">
+                        <span className="block truncate" style={isMe ? { color: accent } : undefined}>{name}</span>
                       </td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-zinc-600">{row.mp}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-zinc-600">{row.gf}</td>
-                      <td className="pr-4 pl-2 py-2.5 text-right tabular-nums text-zinc-600">{row.ga}</td>
+                      <td className="px-1 py-2 text-right tabular-nums text-zinc-600">{row.mp}</td>
+                      <td className="px-1 py-2 text-right tabular-nums text-zinc-600">{row.gf}</td>
+                      <td className="px-1 py-2 text-right tabular-nums text-zinc-600">{row.ga}</td>
+                      <td className="pr-3 pl-1 py-2 text-right tabular-nums text-zinc-600"
+                          style={row.gd > 0 ? { color: accent } : row.gd < 0 ? { color: "#ef4444" } : undefined}>
+                        {row.gd > 0 ? `+${row.gd}` : row.gd}
+                      </td>
                     </tr>
                   );
                 })}

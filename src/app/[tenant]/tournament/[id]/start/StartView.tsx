@@ -70,9 +70,10 @@ function estimateTournamentTime(
   let playoffMinutes = 0;
   if (advancesPerGroup > 0) {
     const totalAdvancing = advancesPerGroup * numGroups;
-    // QF: up to 4 simultaneous matches
-    if (totalAdvancing > 4) playoffMinutes += Math.ceil(4 / activeCourts) * matchMinutes;
-    // SF: up to 2 simultaneous matches
+    // QF: all matches play simultaneously — exact count = teams beyond the 4 SF spots
+    const qfMatches = totalAdvancing > 4 ? totalAdvancing - 4 : 0;
+    if (qfMatches > 0) playoffMinutes += Math.ceil(qfMatches / activeCourts) * matchMinutes;
+    // SF: all 2 matches simultaneously
     if (totalAdvancing > 2) playoffMinutes += Math.ceil(2 / activeCourts) * matchMinutes;
     // Final (and bronze runs on another court simultaneously if possible)
     const finalSlotMatches = hasBronze ? 2 : 1;
@@ -426,7 +427,9 @@ export function StartView({
         </div>
       )}
 
-      <main className="p-6 max-w-3xl space-y-5">
+      <main className="p-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-5">
         {soloTeams.length > 0 && (
           <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
             <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
@@ -587,16 +590,36 @@ export function StartView({
                 {advancesPerGroup === 0 ? "–" : advancesPerGroup}
               </span>
             </div>
-            {advancesPerGroup > 0 && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                {advancesPerGroup * numGroups} lag totalt →{" "}
-                {advancesPerGroup * numGroups <= 2
-                  ? "Final"
-                  : advancesPerGroup * numGroups <= 4
-                    ? "Semifinal → Final"
-                    : "Kvartsfinal → Semifinal → Final"}
-              </p>
-            )}
+            {advancesPerGroup > 0 && (() => {
+              const total = advancesPerGroup * numGroups;
+              const qfCourts = total > 4 ? total - 4 : 0;
+              const sfCourts = 2;
+              const finalCourts = hasBronze ? 2 : 1;
+              const court = (n: number) => n === 1 ? "1 bana" : `${n} banor`;
+              if (total <= 2) return (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  {total} lag totalt → Final <span className="text-zinc-400 dark:text-zinc-500">({court(finalCourts)})</span>
+                </p>
+              );
+              if (total <= 4) return (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  {total} lag totalt →{" "}
+                  Semifinal <span className="text-zinc-400 dark:text-zinc-500">({court(sfCourts)})</span>
+                  {" → "}
+                  Final <span className="text-zinc-400 dark:text-zinc-500">({court(finalCourts)})</span>
+                </p>
+              );
+              return (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  {total} lag totalt →{" "}
+                  Kvartsfinal <span className="text-zinc-400 dark:text-zinc-500">({court(qfCourts)})</span>
+                  {" → "}
+                  Semifinal <span className="text-zinc-400 dark:text-zinc-500">({court(sfCourts)})</span>
+                  {" → "}
+                  Final <span className="text-zinc-400 dark:text-zinc-500">({court(finalCourts)})</span>
+                </p>
+              );
+            })()}
             {advancesPerGroup === 0 && (
               <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Inget slutspel</p>
             )}
@@ -650,6 +673,9 @@ export function StartView({
           </section>
         )}
 
+        </div>{/* end left column */}
+
+        <div className="space-y-5">
         <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
           <div className="flex items-start justify-between mb-2 gap-3">
             <div>
@@ -742,6 +768,8 @@ export function StartView({
             {submitting ? "Startar..." : "Starta session →"}
           </button>
         </div>
+        </div>{/* end right column */}
+        </div>{/* end grid */}
       </main>
     </div>
   );

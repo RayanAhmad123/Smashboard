@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
@@ -187,22 +187,38 @@ export function StartView({
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // When numGroups shrinks, clamp out-of-range assignments back into bounds.
+  // Auto pre-assign courts to groups when the host picks a group count.
+  // Fires on mount and whenever numGroups changes; ignores fullTeamCount
+  // changes so a host can pair a solo team without losing manual court edits.
+  const prevNumGroupsRef = useRef<number | null>(null);
   useEffect(() => {
-    setCourtGroupIdx((prev) => {
-      let dirty = false;
-      const next: Record<string, number> = {};
-      for (const [id, g] of Object.entries(prev)) {
-        if (g >= numGroups) {
-          next[id] = g % Math.max(1, numGroups);
-          dirty = true;
-        } else {
-          next[id] = g;
-        }
+    if (prevNumGroupsRef.current === numGroups) return;
+    prevNumGroupsRef.current = numGroups;
+    if (courts.length === 0 || numGroups < 1) return;
+
+    const newSelected = new Set<string>();
+    const newCourtGroup: Record<string, number> = {};
+    let courtIdx = 0;
+    for (let g = 0; g < numGroups; g++) {
+      const want = suggestedCourtsPerGroup[g] ?? 1;
+      for (let c = 0; c < want && courtIdx < courts.length; c++) {
+        const court = courts[courtIdx];
+        newSelected.add(court.id);
+        newCourtGroup[court.id] = g;
+        courtIdx++;
       }
-      return dirty ? next : prev;
-    });
-  }, [numGroups]);
+    }
+    while (courtIdx < courts.length) {
+      newCourtGroup[courts[courtIdx].id] = courtIdx % numGroups;
+      courtIdx++;
+    }
+    setSelectedCourts(newSelected);
+    setCourtGroupIdx(newCourtGroup);
+    // suggestedCourtsPerGroup is read but intentionally not in deps —
+    // it changes with fullTeamCount, and we only want numGroups changes
+    // to trigger a reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numGroups, courts]);
 
   const soloTeams = teams.filter((t) => !t.player2_id);
   const allUsed = useMemo(() => {
@@ -250,10 +266,27 @@ export function StartView({
   }, [selectedCourts, courtGroupIdx, numGroups]);
   const allGroupsHaveCourts = groupCourtCounts.every((c) => c >= 1);
 
-  // Recommended courts: floor(teamsPerGroup / 2) simultaneous matches per group.
-  const teamsPerGroup = fullTeamCount > 0 ? Math.floor(fullTeamCount / Math.max(1, numGroups)) : 0;
-  const suggestedCourtsPerGroup = Math.floor(teamsPerGroup / 2);
-  const suggestedTotalCourts = Math.max(1, numGroups * suggestedCourtsPerGroup);
+  // Per-group team counts mirror the round-robin distribution at submit
+  // (shuffle then i % groupCount): the first `n%g` groups get one extra team.
+  const teamsPerGroupArray = useMemo(() => {
+    if (fullTeamCount < 1 || numGroups < 1) return [];
+    const base = Math.floor(fullTeamCount / numGroups);
+    const remainder = fullTeamCount % numGroups;
+    return Array.from({ length: numGroups }, (_, i) =>
+      base + (i < remainder ? 1 : 0)
+    );
+  }, [fullTeamCount, numGroups]);
+  const suggestedCourtsPerGroup = useMemo(
+    () => teamsPerGroupArray.map((n) => Math.max(1, Math.floor(n / 2))),
+    [teamsPerGroupArray]
+  );
+  const suggestedTotalCourts = useMemo(
+    () =>
+      suggestedCourtsPerGroup.length === 0
+        ? 1
+        : suggestedCourtsPerGroup.reduce((a, b) => a + b, 0),
+    [suggestedCourtsPerGroup]
+  );
 
   // Use selected courts if any; fall back to the suggested count for estimates
   // before the host has picked courts.
@@ -730,31 +763,36 @@ export function StartView({
 
         <div className="space-y-5">
         <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
-          <div className="flex items-start justify-between mb-2 gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Banor</h2>
-              {fullTeamCount >= 2 && (
-                <p className="text-xs mt-0.5"
-                  style={{
-                    color: selectedCourts.size === suggestedTotalCourts
+          <div className="mb-2">
+            <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Banor</h2>
+            {fullTeamCount >= 2 && suggestedCourtsPerGroup.length > 0 && (
+              <div className="text-xs mt-0.5 space-y-0.5">
+                {suggestedCourtsPerGroup.map((rec, i) => {
+                  const assigned = groupCourtCounts[i] ?? 0;
+                  const teams = teamsPerGroupArray[i];
+                  const color =
+                    assigned === rec
                       ? accent
-                      : selectedCourts.size < suggestedTotalCourts
+                      : assigned < rec
                         ? "#d97706"
-                        : "#71717a",
-                  }}
-                >
-                  {suggestedTotalCourts} rekommenderas
-                  {numGroups > 1 ? ` (${suggestedCourtsPerGroup} per grupp)` : ""}
-                  {" "}för {fullTeamCount} lag
-                </p>
-              )}
-            </div>
-            {numGroups > 1 && selectedCourts.size > 0 && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">
-                {groupCourtCounts
-                  .map((n, i) => `${String.fromCharCode(65 + i)}: ${n}`)
-                  .join(" · ")}
-              </span>
+                        : "#71717a";
+                  const banorWord = rec === 1 ? "bana" : "banor";
+                  return (
+                    <div key={i} style={{ color }}>
+                      {numGroups > 1
+                        ? `Grupp ${String.fromCharCode(65 + i)}: `
+                        : ""}
+                      {teams} lag → {rec} {banorWord} rekommenderas
+                      {assigned !== rec && (
+                        <span className="text-zinc-500 dark:text-zinc-400">
+                          {" "}
+                          ({assigned} {assigned === 1 ? "vald" : "valda"})
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
           {courts.length === 0 ? (

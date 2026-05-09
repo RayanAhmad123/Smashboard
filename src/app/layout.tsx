@@ -15,37 +15,55 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://triadsolutions.se"),
   title: {
-    default: "Smashboard — Turneringssystem för padelhallar",
+    default:
+      "Smashboard — Turneringssystem för padelhallar | Mexicano & Americano på TV",
     template: "%s · Smashboard",
   },
   description:
-    "Mexicano, Americano och Lag-Mexicano direkt på storbildsskärm. Hosten skriver in resultat på laptopen — allt uppdateras live på TV:n. White-label för padelhallar.",
+    "Smashboard är turneringssystemet för padelhallar. Kör Mexicano, Americano och Lag-Mexicano med live TV-display via HDMI. White-label från 499 kr/mån — utan bindningstid.",
   applicationName: "Smashboard",
+  category: "Sports tournament software",
   keywords: [
     "padel",
     "padelturnering",
-    "mexicano",
-    "americano",
+    "padelturneringar",
+    "mexicano padel",
+    "americano padel",
+    "lag-mexicano",
     "padelhall",
-    "turneringssystem",
+    "padelhallar",
+    "turneringssystem padel",
+    "padelturnering app",
+    "padel scoreboard",
+    "padel tv display",
+    "white label padel",
     "smashboard",
     "triad solutions",
   ],
-  authors: [{ name: "Triad Solutions" }],
+  authors: [{ name: "Triad Solutions", url: "https://triadsolutions.se" }],
+  creator: "Triad Solutions",
+  publisher: "Triad Solutions",
+  alternates: {
+    canonical: "/",
+    languages: {
+      "sv-SE": "/",
+    },
+  },
   openGraph: {
     type: "website",
     locale: "sv_SE",
     url: "https://triadsolutions.se",
     siteName: "Smashboard",
-    title: "Smashboard — Turneringssystem för padelhallar",
+    title:
+      "Smashboard — Turneringssystem för padelhallar | Mexicano & Americano live på TV",
     description:
-      "Storskärmen som dina spelare stannar för. Mexicano, Americano och Lag-Mexicano — utan kalkylark, utan kaos.",
+      "Storskärmen som dina spelare stannar för. Mexicano, Americano och Lag-Mexicano med live TV-display — från 499 kr/mån, utan bindningstid.",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Smashboard turneringsdisplay",
+        alt: "Smashboard turneringsdisplay på TV — Mexicano live",
       },
     ],
   },
@@ -53,11 +71,25 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Smashboard — Turneringssystem för padelhallar",
     description:
-      "Storskärmen som dina spelare stannar för. Live-uppdaterad TV-display för Mexicano, Americano och Lag-Mexicano.",
+      "Live TV-display för Mexicano, Americano och Lag-Mexicano. White-label från 499 kr/månad. Boka demo.",
     images: ["/og.png"],
   },
   icons: {
     icon: "/icons/logo.svg",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 

@@ -42,6 +42,11 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <a href="#priser" className="hover:text-emerald-700">
+                  Priser
+                </a>
+              </li>
+              <li>
                 <a href="#vanliga-fragor" className="hover:text-emerald-700">
                   Vanliga frågor
                 </a>

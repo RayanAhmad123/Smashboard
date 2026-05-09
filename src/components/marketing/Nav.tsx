@@ -9,6 +9,7 @@ const links = [
   { href: "#funktioner", label: "Funktioner" },
   { href: "#tv-display", label: "TV-display" },
   { href: "#format", label: "Format" },
+  { href: "#priser", label: "Priser" },
   { href: "#vanliga-fragor", label: "Vanliga frågor" },
 ];
 

@@ -3,8 +3,12 @@ import { Section } from "./Section";
 
 const items = [
   {
-    q: "Vad kostar det?",
-    a: "Vi prissätter per hall och anpassar oss efter er storlek och era turneringsvolymer. Boka en demo så går vi igenom upplägget och ger ett pris direkt på samtalet.",
+    q: "Vad kostar Smashboard?",
+    a: "Smashboard kostar från 499 kr/månad för en mindre hall och 999 kr/månad för en hall med obegränsat antal banor. För padelkedjor med flera anläggningar tar vi fram ett anpassat avtal. Alla priser är exklusive moms och utan bindningstid.",
+  },
+  {
+    q: "Är det någon startavgift eller installationskostnad?",
+    a: "Nej. Onboarding, white-label-uppsättning (logga, färg, subdomän) och första turneringen ingår i månadspriset. Du betalar bara den löpande månadskostnaden.",
   },
   {
     q: "Hur många banor kan ni hantera?",

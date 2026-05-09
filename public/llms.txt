@@ -1,0 +1,57 @@
+# Smashboard
+
+> Smashboard är ett white-label turneringssystem för padelhallar. Hosten skriver in resultat på sin laptop och allt visas live på en TV-skärm via HDMI. Stöder Mexicano, Americano och Lag-Mexicano.
+
+Smashboard byggs av Triad Solutions i Sverige. Produkten används av padelhallar som vill köra professionella turneringar utan kalkylark, manuella tabeller eller dyr utrustning. Varje hall får en egen subdomän (t.ex. minhall.triadsolutions.se), egen logga och egen accentfärg — Smashboards eget varumärke syns aldrig på storskärmen.
+
+## Vad gör Smashboard
+
+- **TV-display (read-only)**: Stora siffror, tydliga banor och realtidsuppdateringar via Supabase Realtime. Ansluts till valfri TV via HDMI från laptopen.
+- **Host-vy**: Personalen lägger till spelare, väljer format, startar turneringen och knappar in poäng. Inga manualer behövs.
+- **Format**: Mexicano (dynamiska par per rond), Americano (full round-robin individuellt), Lag-Mexicano (fasta par, banor roterar efter prestation).
+- **A/B/C-slutspel**: Separat slutspel per avancerande rank.
+- **White-label**: Egen subdomän, logga, accentfärg per padelhall.
+- **Spelarregister**: Spara spelare mellan turneringar, se historik.
+
+## Priser
+
+Priserna är per padelhall och faktureras månadsvis utan bindningstid:
+
+- **Start — 499 kr/månad**: Mindre hall med upp till 4 banor. Alla format, TV-display, egen subdomän, e-postsupport.
+- **Hall — 999 kr/månad**: Obegränsat antal banor, full white-label, A/B/C-slutspel, prioriterad support.
+- **Kedja — anpassat pris**: Flera anläggningar under samma avtal, konsoliderad statistik, SLA, dedikerad kontakt.
+
+Alla priser exklusive moms. Onboarding och white-label-uppsättning ingår — ingen startavgift.
+
+## Hårdvara som krävs
+
+En vanlig laptop med modern webbläsare (Chrome, Safari, Edge, Firefox) och en TV med HDMI-ingång. Ingen app, inga drivrutiner, ingen installation. Om laptopens wifi går ner fortsätter Smashboard att visa det senast synkade läget.
+
+## Tekniskt
+
+- Byggd med Next.js 15 (App Router), Supabase (Postgres + Auth + Realtime) och Tailwind CSS.
+- Hostas på Vercel.
+- Multi-tenant via subdomän — Next.js middleware läser host-headern och slår upp tenant-slug.
+- All data lagras inom EU (Supabase Frankfurt). GDPR-kompatibel — hallen äger sin spelardata och kan exportera eller radera den.
+
+## Kontakt
+
+- E-post: kontakt@triadsolutions.se
+- Webbplats: https://triadsolutions.se
+- Demo bokas via webbplatsen eller direkt via mail. Demon tar 20 minuter och visar systemet live.
+
+## Vanliga frågor
+
+**Vem är Smashboard till för?** Padelhallar i Sverige (och Norden) som regelbundet kör Mexicano-, Americano- eller lagbaserade turneringar. Allt från ensamma hallar till padelkedjor.
+
+**Krävs det installation?** Nej. Hallen får inloggning till sin subdomän och kan köra första turneringen samma dag.
+
+**Bindningstid?** Ingen. Säg upp när som helst.
+
+**Stöder Smashboard slutspel?** Ja — A/B/C-slutspel där varje avancerande rankgrupp får sitt eget bracket.
+
+**Kan jag exportera spelar- eller resultatdata?** Ja, hallen äger all data och kan exportera eller radera den när som helst.
+
+## Optional
+
+- [Hemsida](https://triadsolutions.se): Produktöversikt, format, priser och bokning av demo.

@@ -4,7 +4,9 @@ import { Footer } from "@/components/marketing/Footer";
 import { Formats } from "@/components/marketing/Formats";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { JsonLd } from "@/components/marketing/JsonLd";
 import { Nav } from "@/components/marketing/Nav";
+import { Pricing } from "@/components/marketing/Pricing";
 import { TVShowcase } from "@/components/marketing/TVShowcase";
 import { ValueProps } from "@/components/marketing/ValueProps";
 import { WhiteLabel } from "@/components/marketing/WhiteLabel";
@@ -15,6 +17,7 @@ export default function Home() {
       className="font-sans"
       style={{ backgroundColor: "#ffffff", color: "#0a0a0a" }}
     >
+      <JsonLd />
       <Nav />
       <Hero />
       <ValueProps />
@@ -22,6 +25,7 @@ export default function Home() {
       <Formats />
       <HowItWorks />
       <WhiteLabel />
+      <Pricing />
       <CTASection />
       <FAQ />
       <Footer />

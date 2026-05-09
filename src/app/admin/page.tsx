@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { requireSuperAdmin } from "@/lib/auth/require";
 import { AdminConsole, type CustomerRow } from "./AdminConsole";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminPage() {
   await requireSuperAdmin();

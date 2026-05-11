@@ -168,6 +168,7 @@ export function StartView({
   const [gamesPerMatch, setGamesPerMatch] = useState(5);
   const [advancesPerGroup, setAdvancesPerGroup] = useState(0);
   const [hasBronze, setHasBronze] = useState(false);
+  const [lottning, setLottning] = useState<"automatic" | "manual">("automatic");
   const [selectedCourts, setSelectedCourts] = useState<Set<string>>(
     new Set<string>()
   );
@@ -429,6 +430,28 @@ export function StartView({
     setErr(null);
     setSubmitting(true);
     try {
+      if (lottning === "manual") {
+        // Hand off to /draw, which finishes the activation after the host
+        // has dragged each team into a group.
+        sessionStorage.setItem(
+          `draw-${tournament.id}`,
+          JSON.stringify({
+            numGroups,
+            gamesPerMatch,
+            advancesPerGroup,
+            hasBronze,
+            selectedCourts: [...selectedCourts],
+            courtGroupIdx,
+            qfCourtIds: [...qfCourtIds],
+            sfCourtIds: [...sfCourtIds],
+            finalCourtIds: [...finalCourtIds],
+            pairing,
+          })
+        );
+        router.push(`/${tenant.slug}/tournament/${tournament.id}/draw`);
+        return;
+      }
+
       // 0. Wipe any stale groups/matches from a previous failed submission.
       await resetTournamentGroupData(tournament.id);
 
@@ -1021,6 +1044,36 @@ export function StartView({
 
         <div className="space-y-5">
         <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
+          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Lottning</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { value: "automatic", label: "Automatisk", desc: "Slumpa lag i grupperna" },
+              { value: "manual", label: "Manuell", desc: "Dra lag till valfri grupp" },
+            ] as const).map((opt) => {
+              const active = lottning === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setLottning(opt.value)}
+                  aria-pressed={active}
+                  className="text-left rounded-lg border px-3 py-2 transition"
+                  style={active
+                    ? { borderColor: accent, backgroundColor: `${accent}10` }
+                    : { borderColor: "#e4e4e7" }
+                  }
+                >
+                  <div className="text-sm font-medium" style={active ? { color: accent } : undefined}>
+                    {opt.label}
+                  </div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{opt.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4">
           <div className="mb-2">
             <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Banor</h2>
             {fullTeamCount >= 2 && suggestedCourtsPerGroup.length > 0 && (
@@ -1112,7 +1165,9 @@ export function StartView({
             className="px-6 py-2.5 rounded-md text-white text-sm font-semibold disabled:opacity-50"
             style={{ backgroundColor: accent }}
           >
-            {submitting ? "Startar..." : "Starta session →"}
+            {submitting
+              ? lottning === "manual" ? "Öppnar lottning…" : "Startar..."
+              : lottning === "manual" ? "Lotta lag →" : "Starta session →"}
           </button>
         </div>
         </div>{/* end right column */}

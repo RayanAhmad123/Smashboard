@@ -1276,12 +1276,21 @@ function HostInner({
           </>
         ) : (
           <div className="space-y-4">
-            <KOResultsPanel
-              koMatches={koMatches}
-              teamMap={teamMap}
-              playerMap={playerMap}
-              bracketMode={tournament.bracket_mode}
-            />
+            {tournamentPhase === "done" ? (
+              <RestPositionsPanel
+                koMatches={koMatches}
+                teamMap={teamMap}
+                playerMap={playerMap}
+                bracketMode={tournament.bracket_mode}
+              />
+            ) : (
+              <KOResultsPanel
+                koMatches={koMatches}
+                teamMap={teamMap}
+                playerMap={playerMap}
+                bracketMode={tournament.bracket_mode}
+              />
+            )}
             {sortedBrackets.length === 0 ? (
               <div className="text-sm text-zinc-500">Inga slutspelsmatcher.</div>
             ) : (
@@ -2070,6 +2079,119 @@ function WinnerTable({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function RestPositionsPanel({
+  koMatches,
+  teamMap,
+  playerMap,
+  bracketMode,
+}: {
+  koMatches: TournamentMatch[];
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  bracketMode: "single" | "split";
+}) {
+  type RestEntry = { rank: string; names: string[] };
+
+  const loserOf = (m: TournamentMatch): string | null => {
+    const t1Wins = (m.score_team1 ?? 0) > (m.score_team2 ?? 0);
+    const id = t1Wins ? m.team2_id : m.team1_id;
+    const t = teamMap.get(id);
+    return t ? shortTeamName(t, playerMap) : null;
+  };
+
+  const byBracket = new Map<string, TournamentMatch[]>();
+  for (const m of koMatches) {
+    const b = m.bracket ?? "A";
+    const arr = byBracket.get(b) ?? [];
+    arr.push(m);
+    byBracket.set(b, arr);
+  }
+  const sortedBrackets = [...byBracket.keys()].sort();
+
+  const bracketEntries = sortedBrackets.map((bracket) => {
+    const matches = byBracket.get(bracket) ?? [];
+    const bronze = matches.find(
+      (m) => m.stage === "bronze" && m.status === "completed"
+    );
+    const qfs = matches.filter(
+      (m) => m.stage === "quarter_final" && m.status === "completed"
+    );
+
+    const entries: RestEntry[] = [];
+
+    if (bronze) {
+      const name = loserOf(bronze);
+      if (name) entries.push({ rank: "4", names: [name] });
+    }
+
+    const qfLosers = qfs
+      .map((m) => loserOf(m))
+      .filter((n): n is string => Boolean(n));
+    if (qfLosers.length > 0) {
+      const start = 5;
+      const end = start + qfLosers.length - 1;
+      entries.push({
+        rank: qfLosers.length === 1 ? String(start) : `${start}–${end}`,
+        names: qfLosers,
+      });
+    }
+
+    return { bracket, entries };
+  });
+
+  if (bracketEntries.every((b) => b.entries.length === 0)) return null;
+
+  return (
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+      <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 font-medium text-sm text-zinc-700 dark:text-zinc-300">
+        Övriga placeringar
+      </div>
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${sortedBrackets.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {bracketEntries.map(({ bracket, entries }) => (
+          <div
+            key={bracket}
+            className="border-r last:border-r-0 border-zinc-100 dark:border-zinc-800"
+          >
+            {sortedBrackets.length > 1 && (
+              <div className="px-3 py-1.5 text-xs font-semibold border-b border-zinc-100 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200">
+                {bracketLabelForMode(bracket, bracketMode)}
+              </div>
+            )}
+            {entries.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-zinc-500">–</div>
+            ) : (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {entries.map((e) => (
+                  <div key={e.rank} className="px-3 py-2 flex items-start gap-3">
+                    <span className="shrink-0 inline-flex items-center justify-center min-w-[2.25rem] h-6 px-1.5 rounded-md text-[11px] font-bold tabular-nums bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                      {e.rank}
+                    </span>
+                    <ul className="flex-1 min-w-0 space-y-0.5">
+                      {e.names.map((n, i) => (
+                        <li
+                          key={i}
+                          className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate"
+                        >
+                          {n}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

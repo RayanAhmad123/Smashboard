@@ -27,7 +27,7 @@ export type Player = {
 
 export type TournamentFormat = "gruppspel" | "mexicano" | "americano" | "team_mexicano";
 export type TournamentStatus = "draft" | "active" | "completed";
-export type GroupFormation = "random" | "seeded";
+export type GroupFormation = "random" | "seeded" | "manual";
 
 export type Tournament = {
   id: string;

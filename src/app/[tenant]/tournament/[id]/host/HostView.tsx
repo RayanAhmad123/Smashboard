@@ -427,6 +427,62 @@ function HostInner({
     return "done";
   }, [allGroupDone, hasKO, advancesPerGroup, koMatches]);
 
+  type WinnerPodium = {
+    bracket: string | null;
+    first: string | null;
+    second: string | null;
+    third: string | null;
+    thirdAlt: string | null;
+  };
+  const winners = useMemo<WinnerPodium[] | null>(() => {
+    if (tournamentPhase !== "done") return null;
+
+    if (hasKO) {
+      const bracketKeys = [...new Set(koMatches.map((m) => m.bracket ?? "A"))].sort();
+      return bracketKeys.map((bracket) => {
+        const bMatches = koMatches.filter((m) => (m.bracket ?? "A") === bracket);
+        const final = bMatches.find((m) => m.stage === "final" && m.status === "completed");
+        const bronze = bMatches.find((m) => m.stage === "bronze" && m.status === "completed");
+        const semis = bMatches.filter((m) => m.stage === "semi_final" && m.status === "completed");
+
+        let first: string | null = null;
+        let second: string | null = null;
+        let third: string | null = null;
+        let thirdAlt: string | null = null;
+
+        if (final) {
+          const t1Wins = (final.score_team1 ?? 0) > (final.score_team2 ?? 0);
+          first = t1Wins ? final.team1_id : final.team2_id;
+          second = t1Wins ? final.team2_id : final.team1_id;
+        }
+        if (bronze) {
+          const t1Wins = (bronze.score_team1 ?? 0) > (bronze.score_team2 ?? 0);
+          third = t1Wins ? bronze.team1_id : bronze.team2_id;
+        } else if (semis.length >= 2) {
+          const losers = semis.slice(0, 2).map((m) => {
+            const t1Wins = (m.score_team1 ?? 0) > (m.score_team2 ?? 0);
+            return t1Wins ? m.team2_id : m.team1_id;
+          });
+          third = losers[0] ?? null;
+          thirdAlt = losers[1] ?? null;
+        }
+
+        return { bracket, first, second, third, thirdAlt };
+      });
+    }
+
+    const overall = computeStandings(teams, matches, playerMap);
+    return [
+      {
+        bracket: null,
+        first: overall[0]?.team_id ?? null,
+        second: overall[1]?.team_id ?? null,
+        third: overall[2]?.team_id ?? null,
+        thirdAlt: null,
+      },
+    ];
+  }, [tournamentPhase, hasKO, koMatches, teams, matches, playerMap]);
+
   // KO progress aggregated per bracket (A/B/C…). Used both in the header
   // status chips and inside each bracket section card.
   type BracketProgress = {
@@ -1162,6 +1218,15 @@ function HostInner({
         </div>
       )}
 
+      {winners && winners.length > 0 && (
+        <WinnerTable
+          winners={winners}
+          teamMap={teamMap}
+          playerMap={playerMap}
+          bracketMode={tournament.bracket_mode}
+        />
+      )}
+
       {tournamentPhase === "ready_for_playoff" && (
         <PlayoffPanel
           tournament={tournament}
@@ -1794,6 +1859,147 @@ function MatchCard({
 }
 
 // Shows completed KO match results, grouped by bracket then by stage.
+type WinnerPodiumRow = {
+  bracket: string | null;
+  first: string | null;
+  second: string | null;
+  third: string | null;
+  thirdAlt: string | null;
+};
+
+function MedalBadge({ position }: { position: 1 | 2 | 3 }) {
+  const styles = {
+    1: { bg: "#fbbf24", ring: "#f59e0b", text: "#78350f" },
+    2: { bg: "#d4d4d8", ring: "#a1a1aa", text: "#27272a" },
+    3: { bg: "#d97706", ring: "#b45309", text: "#fff7ed" },
+  } as const;
+  const s = styles[position];
+  return (
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center text-base font-black shrink-0 shadow-sm"
+      style={{
+        background: `radial-gradient(circle at 30% 30%, ${s.bg}, ${s.ring})`,
+        color: s.text,
+      }}
+      aria-hidden
+    >
+      {position}
+    </div>
+  );
+}
+
+function WinnerTable({
+  winners,
+  teamMap,
+  playerMap,
+  bracketMode,
+}: {
+  winners: WinnerPodiumRow[];
+  teamMap: Map<string, TournamentTeam>;
+  playerMap: Map<string, Player>;
+  bracketMode: "single" | "split";
+}) {
+  const nameOf = (id: string | null): string | null => {
+    if (!id) return null;
+    const t = teamMap.get(id);
+    return t ? teamName(t, playerMap) : null;
+  };
+
+  const showBracketLabel = winners.length > 1 || winners[0]?.bracket != null;
+
+  return (
+    <div className="border-b border-amber-200 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 via-white to-white dark:from-amber-950/30 dark:via-zinc-900 dark:to-zinc-900 px-5 py-5">
+      <div className="flex items-center gap-2 mb-3">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-5 h-5 text-amber-600 dark:text-amber-400"
+          aria-hidden="true"
+        >
+          <path d="M6 9H4a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1h3" />
+          <path d="M18 9h2a2 2 0 0 0 2-2V5a1 1 0 0 0-1-1h-3" />
+          <path d="M6 4h12v7a6 6 0 0 1-12 0V4Z" />
+          <path d="M12 17v4" />
+          <path d="M8 21h8" />
+        </svg>
+        <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+          Vinnare
+        </h2>
+      </div>
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${winners.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {winners.map((w) => {
+          const thirdName = nameOf(w.third);
+          const thirdAltName = nameOf(w.thirdAlt);
+          const thirdDisplay = thirdAltName
+            ? thirdName && thirdAltName
+              ? `${thirdName}  ·  ${thirdAltName}`
+              : thirdName ?? thirdAltName
+            : thirdName;
+          return (
+            <div
+              key={w.bracket ?? "main"}
+              className="rounded-lg border border-amber-200/70 dark:border-amber-900/40 bg-white dark:bg-zinc-900 overflow-hidden"
+            >
+              {showBracketLabel && (
+                <div className="px-3 py-1.5 text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 border-b border-amber-100 dark:border-amber-900/40 text-amber-900 dark:text-amber-200">
+                  {w.bracket
+                    ? bracketLabelForMode(w.bracket, bracketMode)
+                    : "Slutställning"}
+                </div>
+              )}
+              <ol className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <li className="px-3 py-2.5 flex items-center gap-3">
+                  <MedalBadge position={1} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-amber-700 dark:text-amber-400">
+                      Guld
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                      {nameOf(w.first) ?? "–"}
+                    </div>
+                  </div>
+                </li>
+                <li className="px-3 py-2.5 flex items-center gap-3">
+                  <MedalBadge position={2} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 dark:text-zinc-400">
+                      Silver
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                      {nameOf(w.second) ?? "–"}
+                    </div>
+                  </div>
+                </li>
+                <li className="px-3 py-2.5 flex items-center gap-3">
+                  <MedalBadge position={3} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-orange-700 dark:text-orange-400">
+                      Brons
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                      {thirdDisplay ?? "–"}
+                    </div>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function KOResultsPanel({
   koMatches,
   teamMap,

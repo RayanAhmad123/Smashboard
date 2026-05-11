@@ -1671,10 +1671,12 @@ function MatchCard({
     setS2(match.score_team2 != null ? String(match.score_team2) : "");
   }, [match.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const a = parseInt(s1, 10);
-  const b = parseInt(s2, 10);
-  const aFilled = s1 !== "" && !Number.isNaN(a);
-  const bFilled = s2 !== "" && !Number.isNaN(b);
+  // Treat an empty input as 0 so that e.g. typing only "5" submits as 5-0.
+  // Both-empty (0-0) is still rejected by the draw check below.
+  const a = s1 === "" ? 0 : parseInt(s1, 10);
+  const b = s2 === "" ? 0 : parseInt(s2, 10);
+  const aFilled = !Number.isNaN(a);
+  const bFilled = !Number.isNaN(b);
   const bothFilled = aFilled && bFilled;
 
   let validationMsg: string | null = null;

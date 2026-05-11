@@ -100,16 +100,41 @@ export function DrawView({
   }, [initialTeams, stash]);
 
   // Initialise assignment map once we know which teams are in play.
+  // Rehydrates from sessionStorage so a refresh doesn't wipe placements.
   useEffect(() => {
     if (!stash) return;
     setAssignments((prev) => {
       // If already populated for this team set, keep it.
       if (Object.keys(prev).length === effectiveTeams.length) return prev;
+
+      let saved: Record<string, number | null> = {};
+      const raw = sessionStorage.getItem(`draw-assignments-${tournament.id}`);
+      if (raw) {
+        try {
+          saved = JSON.parse(raw) as Record<string, number | null>;
+        } catch {
+          saved = {};
+        }
+      }
+
       const next: Record<string, number | null> = {};
-      for (const t of effectiveTeams) next[t.id] = null;
+      for (const t of effectiveTeams) {
+        const v = saved[t.id];
+        next[t.id] =
+          typeof v === "number" && v >= 0 && v < stash.numGroups ? v : null;
+      }
       return next;
     });
-  }, [stash, effectiveTeams]);
+  }, [stash, effectiveTeams, tournament.id]);
+
+  // Persist assignments so a refresh restores them.
+  useEffect(() => {
+    if (Object.keys(assignments).length === 0) return;
+    sessionStorage.setItem(
+      `draw-assignments-${tournament.id}`,
+      JSON.stringify(assignments)
+    );
+  }, [assignments, tournament.id]);
 
   const numGroups = stash?.numGroups ?? 0;
 
@@ -247,6 +272,7 @@ export function DrawView({
       });
 
       sessionStorage.removeItem(`draw-${tournament.id}`);
+      sessionStorage.removeItem(`draw-assignments-${tournament.id}`);
       router.push(`/${tenant.slug}/tournament/${tournament.id}/host`);
     } catch (e) {
       setErr((e as Error).message);

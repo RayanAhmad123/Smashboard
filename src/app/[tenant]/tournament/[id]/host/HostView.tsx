@@ -783,7 +783,8 @@ function HostInner({
         )}
 
         <div className="flex items-center gap-2 shrink-0">
-          {(tournamentPhase === "ko_active" || tournamentPhase === "done") && koBracketProgress.length > 0 ? (
+          {!isFullscreen &&
+          (tournamentPhase === "ko_active" || tournamentPhase === "done") && koBracketProgress.length > 0 ? (
             koBracketProgress.map(({ bracket, completed, total, runningStage }) => (
               <div
                 key={bracket}
@@ -808,15 +809,18 @@ function HostInner({
               </div>
             ))
           ) : null}
-          <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-            <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
-              Totalt
+          {!isFullscreen && (
+            <div className="px-3 py-1 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500 leading-none mb-0.5">
+                Totalt
+              </div>
+              <div className="text-sm font-semibold tabular-nums leading-tight">
+                {completedCount}
+                <span className="text-zinc-400 font-normal">/{totalMatches}</span>
+              </div>
             </div>
-            <div className="text-sm font-semibold tabular-nums leading-tight">
-              {completedCount}
-              <span className="text-zinc-400 font-normal">/{totalMatches}</span>
-            </div>
-          </div>
+          )}
+          {!isFullscreen && (
           <button
             type="button"
             onClick={() => setPaymentOpen(true)}
@@ -838,7 +842,8 @@ function HostInner({
               </span>
             )}
           </button>
-          {tournament.status === "active" && (
+          )}
+          {!isFullscreen && tournament.status === "active" && (
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -900,28 +905,30 @@ function HostInner({
               </svg>
             )}
           </button>
-          <Link
-            href={`/${tenant.slug}/tournament/${tournament.id}/display`}
-            target="_blank"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-4 h-4"
-              aria-hidden="true"
+          {!isFullscreen && (
+            <Link
+              href={`/${tenant.slug}/tournament/${tournament.id}/display`}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
             >
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-            <span className="hidden sm:inline">Öppna TV-visning</span>
-          </Link>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-4 h-4"
+                aria-hidden="true"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <span className="hidden sm:inline">Öppna TV-visning</span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -981,24 +988,6 @@ function HostInner({
       <main className="px-5 py-4">
         {!hasKO ? (
           <>
-            {restingTeamIdsThisRound.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {restingTeamIdsThisRound.map((tid) => {
-                  const t = teamMap.get(tid);
-                  if (!t) return null;
-                  const name = shortTeamName(t, playerMap);
-                  return (
-                    <div
-                      key={tid}
-                      title={`Vilar: ${name}`}
-                      className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 max-w-[14rem] truncate cursor-default"
-                    >
-                      Vilar: {name}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             {groups.length === 0 ? (
               <div className="text-sm text-zinc-500">Inga grupper.</div>
             ) : (
@@ -1021,6 +1010,7 @@ function HostInner({
                     teamMap={teamMap}
                     courtMap={courtMap}
                     matchUiStates={matchUiStates}
+                    restingTeamIds={restingTeamIdsThisRound}
                     advancesPerGroup={advancesPerGroup}
                     gamesPerMatch={tournament.games_per_match}
                     onSave={saveScore}
@@ -2029,6 +2019,7 @@ function GroupColumn({
   teamMap,
   courtMap,
   matchUiStates,
+  restingTeamIds,
   advancesPerGroup,
   gamesPerMatch,
   onSave,
@@ -2042,12 +2033,14 @@ function GroupColumn({
   teamMap: Map<string, TournamentTeam>;
   courtMap: Map<string, Court>;
   matchUiStates: Map<string, { state: MatchUiStateKey; reason: string | null }>;
+  restingTeamIds: string[];
   advancesPerGroup: number;
   gamesPerMatch: number;
   onSave: (m: TournamentMatch, s1: number, s2: number) => Promise<void>;
   busyId: string | null;
 }) {
   const palette = groupPaletteFor(paletteIndex);
+  const restingSet = useMemo(() => new Set(restingTeamIds), [restingTeamIds]);
 
   const matchesByRound = useMemo(() => {
     const map = new Map<number, TournamentMatch[]>();
@@ -2138,6 +2131,7 @@ function GroupColumn({
             {standings.map((s, i) => {
               const t = teamMap.get(s.team_id);
               const slutspel = slutspelLabel(i + 1, advancesPerGroup);
+              const isResting = restingSet.has(s.team_id);
               return (
                 <tr
                   key={s.team_id}
@@ -2154,6 +2148,24 @@ function GroupColumn({
                       >
                         {t ? shortTeamName(t, playerMap) : s.teamName}
                       </span>
+                      {isResting && (
+                        <span
+                          className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300 px-1 py-px rounded bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-800/60"
+                          title="Vilar denna omgång"
+                          aria-label="Vilar denna omgång"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            className="w-2.5 h-2.5"
+                            aria-hidden
+                          >
+                            <path d="M4 3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v14a1 1 0 0 1-2 0v-3.34l6.62-1.84a1 1 0 0 1 1.16.5l.34.68a1 1 0 0 0 1.51.32L17 10.5a1 1 0 0 0-.41-1.74L11 7.5V4a1 1 0 0 0-1.55-.83l-2.45 1.61V3Z" />
+                          </svg>
+                          Vilar
+                        </span>
+                      )}
                       {slutspel && (
                         <span
                           className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 px-1 py-px rounded bg-emerald-100/60 dark:bg-emerald-950/40"

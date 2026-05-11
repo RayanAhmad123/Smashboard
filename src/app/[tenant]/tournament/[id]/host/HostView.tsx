@@ -2138,7 +2138,7 @@ function WinnerTable({
           />
         </div>
 
-        <h2 className="text-center text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 leading-[1.05]">
+        <h2 className="text-center text-base sm:text-lg md:text-xl font-semibold tracking-tight text-zinc-700 dark:text-zinc-300 leading-tight">
           {tournament.name}
         </h2>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import AnalyticsBeacon from "@/components/AnalyticsBeacon";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -114,6 +115,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
+        <GoogleAnalytics />
         <Suspense fallback={null}>
           <AnalyticsBeacon />
         </Suspense>
